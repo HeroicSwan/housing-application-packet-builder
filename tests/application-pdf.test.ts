@@ -1,0 +1,15 @@
+import { describe, expect, it } from "vitest";
+import { PDFDocument } from "pdf-lib";
+import { generateCompletedApplicationPdf, generateSupportingPacketPdf } from "@/lib/applications/pdf";
+import { populateFillablePdf } from "@/lib/applications/fillable-pdf";
+
+describe("completed application PDFs", () => {
+  it("generates a distinct multi-page housing application", async () => {
+    const fields = Array.from({ length: 32 }, (_, index) => ({ key: `field_${index}`, label: `Application field ${index + 1}`, type: index === 10 ? "HOUSEHOLD_TABLE" : "TEXT", required: true, value: index === 10 ? JSON.stringify([{ name: "Synthetic Child", relationship: "Child", dateOfBirth: "2017-04-12", monthlyIncomeCents: 0 }]) : `Synthetic value ${index + 1}`, section: `Section ${Math.floor(index / 5) + 1}`, pageNumber: Math.floor(index / 8) + 1 }));
+    const bytes = await generateCompletedApplicationPdf({ programName: "Family Pathways Rapid Rehousing", applicationName: "Family Pathways Housing Application", templateVersion: 1, applicationReference: "HAP-TEST-APP-V1", generationVersion: 1, generatedAt: new Date("2026-07-12"), fields });
+    const pdf = await PDFDocument.load(bytes); expect(bytes.byteLength).toBeGreaterThan(4000); expect(pdf.getPageCount()).toBeGreaterThanOrEqual(2);
+  });
+  it("assembles an application with a supporting-packet cover and index", async () => { const application = await generateCompletedApplicationPdf({ programName: "Fictional Program", applicationName: "Housing Application", templateVersion: 1, applicationReference: "APP-1", generationVersion: 1, generatedAt: new Date(), fields: [] }); const bytes = await generateSupportingPacketPdf({ applicationBytes: application, applicationReference: "APP-1", applicantName: "Synthetic Client", documents: [{ name: "identity.pdf", category: "IDENTITY" }], missingDocuments: ["Consent form"] }); expect((await PDFDocument.load(bytes)).getPageCount()).toBeGreaterThanOrEqual(2); });
+  it("populates supported AcroForm text and checkbox fields without flattening", async () => { const template = await PDFDocument.create(); const page = template.addPage(); const form = template.getForm(); const name = form.createTextField("applicant_name"); name.addToPage(page); const consent = form.createCheckBox("consent"); consent.addToPage(page); const bytes = await populateFillablePdf(await template.save(), [{ pdfFieldName: "applicant_name", value: "Synthetic Client", fieldType: "TEXT" }, { pdfFieldName: "consent", value: "Yes", fieldType: "BOOLEAN" }]); const result = await PDFDocument.load(bytes); expect(result.getForm().getTextField("applicant_name").getText()).toBe("Synthetic Client"); expect(result.getForm().getCheckBox("consent").isChecked()).toBe(true); });
+  it("fails clearly when a configured PDF field is absent", async () => { const template = await PDFDocument.create(); template.addPage(); await expect(populateFillablePdf(await template.save(), [{ pdfFieldName: "missing_field", value: "Value", fieldType: "TEXT" }])).rejects.toThrow('Configured PDF field "missing_field" does not exist'); });
+});

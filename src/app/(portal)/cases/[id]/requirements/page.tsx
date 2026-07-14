@@ -1,0 +1,22 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { AlertTriangle, ArrowRight } from "lucide-react";
+import { db } from "@/lib/db";
+import { canAccessCase, requireRole } from "@/lib/auth/session";
+import { evaluateRequirements } from "@/lib/requirements/engine";
+import { detectInconsistencies } from "@/lib/requirements/inconsistencies";
+import { CaseHeader } from "@/features/cases/case-header";
+import { SectionHeading } from "@/components/section-heading";
+import { StatusBadge } from "@/components/status-badge";
+import { Button } from "@/components/ui/button";
+
+export default async function RequirementsPage({ params }: { params: Promise<{ id: string }> }) {
+  const user = await requireRole(["CASEWORKER", "REVIEWER"]); const { id } = await params; if (!(await canAccessCase(user, id))) notFound(); const clientCase = await db.clientCase.findUnique({ where: { id }, include: { selectedProgram: { include: { requirements: { orderBy: { sortOrder: "asc" } } } }, householdMembers: true, documents: { include: { extractedFields: true } } } }); if (!clientCase) notFound();
+  if (!clientCase.selectedProgram) return <div><CaseHeader clientCase={clientCase} /><div className="mt-10 border bg-white p-10 text-center"><h2 className="text-2xl font-semibold">Select a program first</h2><p className="mt-2 text-muted-foreground">A program is needed before requirements can be evaluated.</p><Button asChild className="mt-6"><Link href={`/cases/${id}/program`}>Choose a program <ArrowRight /></Link></Button></div></div>;
+  const values = clientCase.documents.flatMap((document) => document.extractedFields.map((field) => ({ fieldName: field.fieldName, value: field.reviewedValue ?? field.extractedValue, category: document.documentCategory })));
+  const caseFacts = { legalName: clientCase.legalName, dateOfBirth: clientCase.dateOfBirth, householdCount: clientCase.householdMembers.length + 1, householdHasChildren: clientCase.householdMembers.some((member) => member.relationship.toLowerCase() === "child"), accessibilityNeeds: clientCase.accessibilityNeeds, documents: clientCase.documents.map((document) => ({ category: document.documentCategory, expirationDate: document.expirationDate })), requiredFields: { current_living_situation: clientCase.currentLivingSituation } };
+  const reviewItems = detectInconsistencies(caseFacts, values);
+  const evaluations = evaluateRequirements(clientCase.selectedProgram.requirements, clientCase.documents.map((document) => ({ category: document.documentCategory, expirationDate: document.expirationDate, processingStatus: document.processingStatus, reviewStatuses: document.extractedFields.map((field) => field.reviewStatus), extractedFields: document.extractedFields })), reviewItems, caseFacts);
+  const complete = evaluations.filter((item) => item.state === "SATISFIED" || item.state === "NOT_APPLICABLE").length;
+  return <div><CaseHeader clientCase={clientCase} /><section className="mt-10"><SectionHeading title="Program requirements" description={`${complete} of ${evaluations.length} checklist items are satisfied or not applicable for ${clientCase.selectedProgram.name}.`} /><div className="mt-5 h-1.5 overflow-hidden rounded-full bg-zinc-200" aria-label={`${complete} of ${evaluations.length} requirements complete`}><div className="h-full rounded-full bg-primary" style={{ width: `${Math.round((complete / evaluations.length) * 100)}%` }} /></div>{reviewItems.length > 0 && <div className="mt-6 rounded-md border border-amber-200 bg-amber-50/70"><div className="flex gap-3 border-b border-amber-200 p-4 font-medium text-amber-900"><AlertTriangle className="h-5 w-5" />Review items are observations, not automatic rejections</div>{reviewItems.map((item) => <div key={item.code} className="border-b border-amber-200 p-4 text-sm text-amber-900 last:border-b-0">{item.message}</div>)}</div>}<div className="mt-6 divide-y border-y">{evaluations.map((item) => <div key={item.id} className="grid gap-4 px-3 py-5 md:grid-cols-[1fr_170px]"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-medium">{item.name}</h3>{!item.isRequired && <span className="text-xs text-muted-foreground">Conditional</span>}</div><p className="mt-1 text-sm text-muted-foreground">{item.description}</p><p className="mt-3 text-sm leading-6">{item.reason}</p></div><div><StatusBadge status={item.state} /></div></div>)}</div></section></div>;
+}

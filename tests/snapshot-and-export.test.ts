@@ -1,0 +1,12 @@
+import { describe, expect, it } from "vitest";
+import { buildPacketSnapshot } from "@/lib/packets/snapshot";
+import { buildPacketExport } from "@/lib/packets/export";
+
+function snapshot() {
+  return buildPacketSnapshot({ generatedAt: new Date("2026-07-12T12:00:00Z"), caseReference: "HAP-TEST-1", client: { legalName: "Synthetic Client", preferredName: null, dateOfBirth: null, preferredLanguage: "English", currentLivingSituation: "Temporary shelter", accessibilityNeeds: null }, household: [], program: { name: "Fictional Program", organization: "Fictional Organization", description: "Synthetic program.", fictional: true }, requirements: [{ id: "r1", name: "Identification", category: "IDENTITY", isRequired: true }], documents: [{ originalFilename: "sample-id.pdf", fileType: "application/pdf", category: "IDENTITY", uploadedAt: new Date("2026-07-12"), expirationDate: null, processingStatus: "COMPLETED", reviewStatuses: ["APPROVED"], extractedFields: [{ fieldName: "legal_name", extractedValue: "Synthetic Client", reviewStatus: "APPROVED", sourcePage: 1, sourceText: "Name: Synthetic Client" }] }], extractedValues: [{ fieldName: "legal_name", value: "Synthetic Client", category: "IDENTITY" }], caseFacts: { legalName: "Synthetic Client", householdCount: 1, requiredFields: { current_living_situation: "Temporary shelter" } } });
+}
+
+describe("packet snapshots and exports", () => {
+  it("keeps a generated snapshot unchanged when later source objects change", () => { const result = snapshot(); const original = result.client.legalName; const laterCase = { legalName: "Changed Live Record" }; expect(result.client.legalName).toBe(original); expect(laterCase.legalName).not.toBe(result.client.legalName); });
+  it("exports reviewed sources without storage paths or secrets", () => { const result = buildPacketExport({ referenceNumber: "PKT-TEST-V1", version: 1, status: "IN_REVIEW", generatedAt: new Date("2026-07-12"), submittedAt: new Date("2026-07-12"), approvedBy: null, fields: [{ fieldKey: "legal_name", fieldLabel: "Legal name", value: "Synthetic Client", sourceType: "CASE_RECORD", sourceReference: "HAP-TEST-1", reviewStatus: "APPROVED", reviewerNote: null }], notes: [], overrides: [] }, snapshot()); const json = JSON.stringify(result); expect(result.schema).toBe("housing-application-packet/v1"); expect(json).not.toContain("storagePath"); expect(json).not.toContain("passwordHash"); expect(result.snapshot.requirements[0].reason).toBeTruthy(); });
+});

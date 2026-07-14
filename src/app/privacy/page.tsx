@@ -1,0 +1,5 @@
+import Link from "next/link";
+
+export default function PrivacyPage() {
+  return <main className="mx-auto max-w-3xl px-6 py-16"><div className="text-sm font-semibold text-primary">Demonstration notice</div><h1 className="mt-4 text-4xl font-semibold tracking-tight">Privacy, safety, and appropriate use</h1><div className="mt-8 space-y-5 border-t pt-6 text-base leading-7 text-muted-foreground"><p>This portfolio application contains synthetic demonstration records. It is not configured for real client information or production use.</p><p>Housing program matches and checklist states are organizational aids, not eligibility decisions. Document extraction is never authoritative. A trained caseworker and reviewer remain responsible for confirming sources, correcting errors, and following applicable policy and law.</p><p>Production deployment requires an organizational security review, private object storage, managed secrets, encryption, retention policies, incident response procedures, and appropriate client consent.</p></div><Link href="/" className="mt-10 inline-block font-semibold text-primary underline underline-offset-4">Return to sign in</Link></main>;
+}

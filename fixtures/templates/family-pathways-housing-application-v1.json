@@ -1,0 +1,22 @@
+{
+  "schema": "housing-application-template/v1",
+  "name": "Family Pathways Housing Application",
+  "program": "Family Pathways Rapid Rehousing",
+  "organization": "Family Pathways Network",
+  "version": 1,
+  "templateType": "GENERATED_PDF",
+  "fieldCount": 32,
+  "sections": [
+    "Applicant information",
+    "Contact information",
+    "Household",
+    "Housing situation",
+    "Income and benefits",
+    "Housing history",
+    "Accessibility and support needs",
+    "Documentation",
+    "Consent and signatures",
+    "Caseworker certification"
+  ],
+  "notice": "Fictional demonstration form. This template does not determine eligibility and is not accepted by any housing agency."
+}

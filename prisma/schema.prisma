@@ -1,0 +1,529 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String             @id @default(cuid())
+  name               String
+  email              String             @unique
+  passwordHash       String
+  role               String
+  isActive           Boolean            @default(true)
+  passwordChangedAt  DateTime            @default(now())
+  failedLoginCount   Int                 @default(0)
+  lockedUntil        DateTime?
+  mfaEnabled         Boolean            @default(false)
+  mfaSecretEncrypted String?
+  mfaRecoveryCodesEncrypted String?
+  createdAt          DateTime           @default(now())
+  assignedCases      ClientCase[]       @relation("AssignedCaseworker")
+  uploadedDocuments  UploadedDocument[] @relation("UploadedBy")
+  reviewedExtractions ExtractedField[]   @relation("ExtractionReviewer")
+  approvedPackets    ApplicationPacket[] @relation("PacketApprover")
+  packetFields       PacketField[]       @relation("FieldReviewer")
+  reviewNotes        ReviewNote[]
+  requirementOverrides RequirementOverride[]
+  auditEvents        AuditEvent[]
+  createdApplicationDrafts ApplicationDraft[] @relation("DraftCreator")
+  answeredDraftFields ApplicationDraftField[] @relation("DraftFieldAnswerer")
+  sessions           AuthSession[]
+  passwordResetTokens PasswordResetToken[]
+  capturedSignatures ApplicationSignature[] @relation("SignatureCapturer")
+  recordedConsents   ConsentRecord[]     @relation("ConsentRecorder")
+  mfaChallenges      MfaChallenge[]
+}
+
+model MfaChallenge {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model AuthSession {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  revokedAt  DateTime?
+  ipHash     String?
+  userAgent  String?
+
+  @@index([userId, expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model RateLimitBucket {
+  key       String   @id
+  count     Int
+  resetAt   DateTime
+  updatedAt DateTime @updatedAt
+}
+
+model ClientCase {
+  id                     String             @id @default(cuid())
+  referenceNumber        String             @unique
+  assignedCaseworkerId   String
+  assignedCaseworker     User               @relation("AssignedCaseworker", fields: [assignedCaseworkerId], references: [id])
+  selectedProgramId      String?
+  selectedProgram        HousingProgram?    @relation(fields: [selectedProgramId], references: [id])
+  status                 String             @default("INTAKE")
+  preferredName          String?
+  legalName              String
+  dateOfBirth            DateTime?
+  preferredLanguage      String?
+  phone                  String?
+  email                  String?
+  currentLivingSituation String?
+  accessibilityNeeds     String?
+  mailingAddress          String?
+  previousAddress         String?
+  emergencyContact        String?
+  veteranStatus           String?
+  benefitPrograms         String?
+  monthlyEarnedIncomeCents Int?
+  monthlyBenefitsIncomeCents Int?
+  otherIncomeCents        Int?
+  consentConfirmedAt      DateTime?
+  desiredMoveInDate       DateTime?
+  transportationNeeds     String?
+  evictionHistory         String?
+  rentalArrearsCents      Int?
+  contactPermission       Boolean?
+  notes                  String?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  householdMembers       HouseholdMember[]
+  documents              UploadedDocument[]
+  packets                ApplicationPacket[]
+  applicationDrafts      ApplicationDraft[]
+  incomeRecords          IncomeRecord[]
+  consents               ConsentRecord[]
+  auditEvents            AuditEvent[]
+
+  @@index([assignedCaseworkerId, status])
+}
+
+model HouseholdMember {
+  id                String     @id @default(cuid())
+  clientCaseId      String
+  clientCase        ClientCase @relation(fields: [clientCaseId], references: [id], onDelete: Cascade)
+  name              String
+  relationship      String
+  dateOfBirth       DateTime?
+  monthlyIncomeCents Int?
+  incomeSource      String?
+  createdAt         DateTime   @default(now())
+  incomeRecords     IncomeRecord[]
+
+  @@index([clientCaseId])
+}
+
+model IncomeRecord {
+  id              String           @id @default(cuid())
+  clientCaseId    String
+  clientCase      ClientCase       @relation(fields: [clientCaseId], references: [id], onDelete: Cascade)
+  householdMemberId String?
+  householdMember HouseholdMember? @relation(fields: [householdMemberId], references: [id], onDelete: SetNull)
+  earnerName      String
+  sourceName      String
+  incomeType      String
+  amountCents     Int
+  frequency       String
+  hoursPerWeek    Float?
+  weeksPerYear    Float?
+  startDate       DateTime?
+  endDate         DateTime?
+  isGross         Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([clientCaseId, endDate])
+  @@index([householdMemberId])
+}
+
+model HousingProgram {
+  id                    String               @id @default(cuid())
+  name                  String
+  organization          String
+  description           String
+  isActive              Boolean              @default(true)
+  applicationDeadline   DateTime?
+  incomeLimitNotes      String?
+  householdRestrictions String?
+  accessibilityNotes    String?
+  contactInformation    String?
+  fictional             Boolean              @default(true)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  requirements          ProgramRequirement[]
+  cases                 ClientCase[]
+  packets               ApplicationPacket[]
+  applicationTemplates  ApplicationTemplate[]
+  submissionDestinations SubmissionDestination[]
+}
+
+model ProgramRequirement {
+  id                       String         @id @default(cuid())
+  housingProgramId         String
+  housingProgram           HousingProgram @relation(fields: [housingProgramId], references: [id], onDelete: Cascade)
+  name                     String
+  category                 String
+  isRequired               Boolean        @default(true)
+  description              String
+  validationRules          String?
+  expirationPeriodDays     Int?
+  applicableHouseholdRules String?
+  requiredFieldName        String?
+  clientField              String?
+  sortOrder                Int            @default(0)
+
+  @@index([housingProgramId, sortOrder])
+}
+
+model UploadedDocument {
+  id               String           @id @default(cuid())
+  clientCaseId     String
+  clientCase       ClientCase       @relation(fields: [clientCaseId], references: [id], onDelete: Cascade)
+  originalFilename String
+  safeFilename     String
+  fileType         String
+  storagePath      String?
+  storageKey       String?
+  storageProvider  String           @default("LOCAL")
+  encryptedAtRest  Boolean          @default(true)
+  checksumSha256   String?
+  sizeBytes        Int?
+  documentCategory String
+  uploadedAt       DateTime         @default(now())
+  expirationDate   DateTime?
+  processingStatus String           @default("PENDING")
+  processingError  String?
+  uploadedById     String
+  uploadedBy       User             @relation("UploadedBy", fields: [uploadedById], references: [id])
+  extractedFields  ExtractedField[]
+  draftDocuments   ApplicationDraftDocument[]
+
+  @@index([clientCaseId, documentCategory])
+  @@index([uploadedById, uploadedAt])
+}
+
+model ApplicationTemplate {
+  id                    String                     @id @default(cuid())
+  housingProgramId      String
+  housingProgram        HousingProgram             @relation(fields: [housingProgramId], references: [id], onDelete: Cascade)
+  name                  String
+  description           String
+  version               Int                        @default(1)
+  status                String                     @default("ACTIVE")
+  templateType          String                     @default("GENERATED_PDF")
+  sourceFilePath        String?
+  sourceStorageKey      String?
+  outputFilenamePattern String
+  publishedAt           DateTime?
+  supersedesTemplateId  String?
+  supersedesTemplate    ApplicationTemplate?       @relation("TemplateVersions", fields: [supersedesTemplateId], references: [id])
+  newerVersions         ApplicationTemplate[]      @relation("TemplateVersions")
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+  fields                ApplicationTemplateField[]
+  drafts                ApplicationDraft[]
+
+  @@unique([housingProgramId, name, version])
+  @@index([housingProgramId, status])
+  @@index([supersedesTemplateId])
+}
+
+model ApplicationTemplateField {
+  id                 String              @id @default(cuid())
+  templateId         String
+  template           ApplicationTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  fieldKey            String
+  displayLabel        String
+  fieldType           String
+  required            Boolean             @default(false)
+  canonicalFieldPath  String?
+  pageNumber          Int
+  section             String
+  displayOrder        Int
+  validationRules     String?
+  conditionalRules    String?
+  formattingRules     String?
+  pdfFieldName        String?
+  positionInformation String?
+  staffGuidance       String?
+  optionsJson         String?
+  draftFields         ApplicationDraftField[]
+
+  @@unique([templateId, fieldKey])
+  @@index([templateId, displayOrder])
+}
+
+model ApplicationDraft {
+  id                String                     @id @default(cuid())
+  clientCaseId      String
+  clientCase        ClientCase                 @relation(fields: [clientCaseId], references: [id], onDelete: Cascade)
+  templateId        String
+  template          ApplicationTemplate        @relation(fields: [templateId], references: [id])
+  templateVersion   Int
+  status            String                     @default("DRAFT")
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  generatedAt       DateTime?
+  generationVersion Int                       @default(0)
+  createdById       String
+  createdBy         User                       @relation("DraftCreator", fields: [createdById], references: [id])
+  fields            ApplicationDraftField[]
+  documents         ApplicationDraftDocument[]
+  signature         ApplicationSignature?
+  consents          ConsentRecord[]
+  submissions       ApplicationSubmission[]
+
+  @@unique([clientCaseId, templateId])
+  @@index([status, updatedAt])
+}
+
+model ApplicationSignature {
+  id                 String           @id @default(cuid())
+  draftId            String           @unique
+  draft              ApplicationDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  signedName         String
+  signerEmail        String?
+  signatureMethod    String           @default("TYPED")
+  attestationVersion String
+  signedAt           DateTime         @default(now())
+  capturedById       String
+  capturedBy         User             @relation("SignatureCapturer", fields: [capturedById], references: [id])
+  signerIpHash       String?
+}
+
+model ConsentRecord {
+  id          String           @id @default(cuid())
+  clientCaseId String
+  clientCase  ClientCase       @relation(fields: [clientCaseId], references: [id], onDelete: Cascade)
+  draftId     String?
+  draft       ApplicationDraft? @relation(fields: [draftId], references: [id], onDelete: SetNull)
+  consentType String
+  version     String
+  granted     Boolean
+  grantedAt   DateTime         @default(now())
+  expiresAt   DateTime?
+  recordedById String
+  recordedBy User              @relation("ConsentRecorder", fields: [recordedById], references: [id])
+  evidenceNote String?
+
+  @@index([clientCaseId, consentType, grantedAt])
+  @@index([draftId])
+}
+
+model SubmissionDestination {
+  id                   String                  @id @default(cuid())
+  housingProgramId     String
+  housingProgram       HousingProgram          @relation(fields: [housingProgramId], references: [id], onDelete: Cascade)
+  name                 String
+  type                 String
+  endpoint             String?
+  recipient            String?
+  configEncrypted      String?
+  enabled              Boolean                 @default(true)
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  submissions          ApplicationSubmission[]
+
+  @@index([housingProgramId, enabled])
+}
+
+model ApplicationSubmission {
+  id                String                @id @default(cuid())
+  draftId           String
+  draft             ApplicationDraft      @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  destinationId     String
+  destination       SubmissionDestination @relation(fields: [destinationId], references: [id])
+  generationVersion Int
+  status            String                @default("PENDING")
+  externalReference String?
+  requestDigest     String?
+  attempts          Int                   @default(0)
+  lastAttemptAt     DateTime?
+  submittedAt       DateTime?
+  responseCode      Int?
+  responseSummary   String?
+  errorMessage      String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@index([draftId, status])
+  @@index([destinationId, createdAt])
+  @@unique([draftId, destinationId, generationVersion])
+}
+
+model BackupRun {
+  id          String    @id @default(cuid())
+  status      String
+  provider    String
+  storageKey  String?
+  checksum    String?
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  errorMessage String?
+
+  @@index([startedAt])
+}
+
+model ApplicationDraftField {
+  id               String                   @id @default(cuid())
+  draftId          String
+  draft            ApplicationDraft         @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  templateFieldId  String
+  templateField    ApplicationTemplateField @relation(fields: [templateFieldId], references: [id])
+  proposedValue    String?
+  finalValue       String?
+  sourceType       String
+  sourceReference  String?
+  populationMethod String
+  reviewState      String                   @default("PENDING")
+  validationState  String                   @default("VALID")
+  staffNote        String?
+  answeredById     String?
+  answeredBy       User?                    @relation("DraftFieldAnswerer", fields: [answeredById], references: [id])
+  answeredAt       DateTime?
+  updatedAt        DateTime                 @updatedAt
+
+  @@unique([draftId, templateFieldId])
+  @@index([draftId, reviewState, validationState])
+}
+
+model ApplicationDraftDocument {
+  id                 String           @id @default(cuid())
+  draftId            String
+  draft              ApplicationDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  uploadedDocumentId String
+  uploadedDocument   UploadedDocument @relation(fields: [uploadedDocumentId], references: [id], onDelete: Cascade)
+  selected           Boolean          @default(false)
+  authorized         Boolean          @default(true)
+
+  @@unique([draftId, uploadedDocumentId])
+}
+
+model ExtractedField {
+  id                 String           @id @default(cuid())
+  uploadedDocumentId String
+  uploadedDocument   UploadedDocument @relation(fields: [uploadedDocumentId], references: [id], onDelete: Cascade)
+  fieldName          String
+  extractedValue     String
+  confidence         Float
+  sourcePage         Int?
+  sourceText         String?
+  reviewStatus       String           @default("PENDING")
+  reviewedValue      String?
+  reviewerId         String?
+  reviewer           User?            @relation("ExtractionReviewer", fields: [reviewerId], references: [id])
+  reviewedAt         DateTime?
+
+  @@index([uploadedDocumentId, reviewStatus])
+}
+
+model ApplicationPacket {
+  id               String           @id @default(cuid())
+  referenceNumber  String           @unique
+  clientCaseId     String
+  clientCase       ClientCase       @relation(fields: [clientCaseId], references: [id], onDelete: Cascade)
+  housingProgramId String
+  housingProgram   HousingProgram   @relation(fields: [housingProgramId], references: [id])
+  status           String           @default("DRAFT")
+  generatedAt      DateTime         @default(now())
+  submittedAt      DateTime?
+  approvedById     String?
+  approvedBy       User?            @relation("PacketApprover", fields: [approvedById], references: [id])
+  version          Int              @default(1)
+  unresolvedConflicts Int           @default(0)
+  snapshotJson       String           @default("{}")
+  fields           PacketField[]
+  reviewNotes      ReviewNote[]
+  requirementOverrides RequirementOverride[]
+
+  @@index([status, generatedAt])
+  @@unique([clientCaseId, version])
+}
+
+model PacketField {
+  id              String            @id @default(cuid())
+  packetId        String
+  packet          ApplicationPacket @relation(fields: [packetId], references: [id], onDelete: Cascade)
+  fieldKey        String
+  fieldLabel      String
+  value           String
+  sourceType      String
+  sourceReference String?
+  isRequired      Boolean           @default(true)
+  reviewStatus    String            @default("PENDING")
+  reviewerNote    String?
+  reviewerId      String?
+  reviewer        User?             @relation("FieldReviewer", fields: [reviewerId], references: [id])
+}
+
+model ReviewNote {
+  id        String            @id @default(cuid())
+  packetId  String
+  packet    ApplicationPacket @relation(fields: [packetId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User              @relation(fields: [authorId], references: [id])
+  note      String
+  createdAt DateTime          @default(now())
+
+  @@index([packetId, createdAt])
+}
+
+model RequirementOverride {
+  id            String            @id @default(cuid())
+  packetId      String
+  packet        ApplicationPacket @relation(fields: [packetId], references: [id], onDelete: Cascade)
+  requirementId String
+  requirementName String
+  reviewerId    String
+  reviewer      User              @relation(fields: [reviewerId], references: [id])
+  note          String
+  createdAt     DateTime          @default(now())
+
+  @@unique([packetId, requirementId])
+  @@index([packetId, createdAt])
+}
+
+model AuditEvent {
+  id           String      @id @default(cuid())
+  userId       String
+  user         User        @relation(fields: [userId], references: [id])
+  clientCaseId String?
+  clientCase   ClientCase? @relation(fields: [clientCaseId], references: [id], onDelete: SetNull)
+  action       String
+  entityType   String
+  entityId     String
+  metadata     String?
+  createdAt    DateTime    @default(now())
+
+  @@index([clientCaseId, createdAt])
+}
