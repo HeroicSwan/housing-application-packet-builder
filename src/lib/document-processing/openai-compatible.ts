@@ -2,7 +2,7 @@ import { env } from "@/lib/env";
 import { processingResultSchema, type DocumentProcessingInput, type DocumentProcessor } from "./types";
 import { extractionPrompt, parseExtractionJson } from "./prompt";
 
-type CompatibleConfig = { name: string; apiKey: string | undefined; model: string; endpoint: string; headers?: Record<string, string> };
+type CompatibleConfig = { name: string; apiKey: string | undefined; model: string; endpoint: string; headers?: Record<string, string>; body?: Record<string, unknown> };
 
 function contentFor(input: DocumentProcessingInput) {
   if (input.mimeType === "text/plain" || input.mimeType === "text/csv") return [{ type: "text", text: `Document filename: ${input.filename}\n\n${Buffer.from(input.bytes).toString("utf8")}` }];
@@ -22,7 +22,7 @@ export class OpenAICompatibleDocumentProcessor implements DocumentProcessor {
       response = await fetch(this.config.endpoint, {
         method: "POST",
         headers: { Authorization: `Bearer ${this.config.apiKey}`, "Content-Type": "application/json", ...this.config.headers },
-        body: JSON.stringify({ model: this.config.model, temperature: 0.1, max_tokens: 1800, response_format: { type: "json_object" }, messages: [{ role: "system", content: extractionPrompt }, { role: "user", content: contentFor(input) }] }),
+        body: JSON.stringify({ model: this.config.model, temperature: 0.1, max_tokens: 1800, response_format: { type: "json_object" }, messages: [{ role: "system", content: extractionPrompt }, { role: "user", content: contentFor(input) }], ...this.config.body }),
         signal: AbortSignal.timeout(env.DOCUMENT_PROCESSOR_TIMEOUT_MS),
       });
       if (response.ok || ![429, 500, 502, 503, 504].includes(response.status) || attempt === 3) break;

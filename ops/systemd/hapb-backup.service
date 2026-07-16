@@ -1,0 +1,12 @@
+[Unit]
+Description=Encrypted Housing Application Packet Builder database backup
+
+[Service]
+Type=oneshot
+User=hapb
+Group=hapb
+WorkingDirectory=/opt/hapb/current
+EnvironmentFile=/etc/hapb/hapb.env
+ExecStart=/usr/bin/npm run backup
+NoNewPrivileges=true
+PrivateTmp=true

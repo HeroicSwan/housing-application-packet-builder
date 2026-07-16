@@ -1,4 +1,12 @@
 import { test, expect, type Page } from "@playwright/test";
+import { PDFDocument, StandardFonts } from "pdf-lib";
+
+async function validPdf(text: string) {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([612, 792]);
+  page.drawText(text, { x: 72, y: 720, size: 12, font: await pdf.embedFont(StandardFonts.Helvetica) });
+  return Buffer.from(await pdf.save());
+}
 
 function monitor(page: Page) {
   const errors: string[] = [];
@@ -41,18 +49,19 @@ test("caseworker and reviewer complete correction and approval lifecycle", async
   await expect(page.getByText("No government-issued identification has been added.")).toBeVisible();
 
   await page.getByRole("link", { name: "Source documents", exact: true }).click();
-  await page.locator("#file").setInputFiles({ name: "sample-id.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 synthetic identity fixture") });
+  await page.locator("#file").setInputFiles({ name: "sample-id.pdf", mimeType: "application/pdf", buffer: await validPdf("Synthetic identity fixture") });
   await page.getByRole("button", { name: "Upload and process" }).click();
   await expect(page.getByTestId("extraction-document_number")).toBeVisible();
   const legalName = page.getByTestId("extraction-legal_name");
-  await legalName.getByRole("textbox").fill("Jordan Lee");
+  await legalName.getByLabel("Reviewed value for legal_name").fill("Jordan Lee");
   await legalName.getByTitle("Save edit").click();
   await expect(legalName.getByText("Edited")).toBeVisible();
   await page.getByTestId("extraction-date_of_birth").getByTitle("Approve").click();
+  await page.getByTestId("extraction-document_number").getByLabel("Review reason for document_number").fill("Synthetic document number is intentionally invalid.");
   await page.getByTestId("extraction-document_number").getByTitle("Reject").click();
   await expect(page.getByTestId("extraction-document_number").getByText("Rejected")).toBeVisible();
 
-  await page.locator("#file").setInputFiles({ name: "sample-income.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 synthetic income fixture") });
+  await page.locator("#file").setInputFiles({ name: "sample-income.pdf", mimeType: "application/pdf", buffer: await validPdf("Synthetic income fixture") });
   await page.getByLabel("Document category").selectOption("INCOME");
   await page.getByRole("button", { name: "Upload and process" }).click();
   await expect(page.getByTestId("extraction-gross_monthly_income")).toBeVisible();

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "adapter": "deterministic-v1",
+  "workloadSize": 120,
+  "requiredScenarios": 23,
+  "expected": {
+    "fieldExactAccuracy": 1,
+    "normalizedAccuracy": 1,
+    "missingValueRate": 0,
+    "hallucinationRate": 0,
+    "sourceGroundingRate": 1,
+    "confidenceBrierScore": 0,
+    "providerFailureRate": 0,
+    "retryRate": 0,
+    "timeoutRate": 0,
+    "invalidOutputRate": 0
+  }
+}

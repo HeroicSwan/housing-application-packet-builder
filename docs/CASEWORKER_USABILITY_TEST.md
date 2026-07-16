@@ -1,6 +1,6 @@
 # Caseworker usability test
 
-This protocol is for moderated testing with real housing caseworkers. Never use real client records in a test environment.
+This protocol is for moderated testing with real housing caseworkers using the synthetic demonstration only. The application is not approved for real applicant information, and no real client records may be used in a test environment.
 
 ## Participants
 
@@ -8,7 +8,7 @@ Recruit 5-8 caseworkers with a mix of intake, document-review, and application-s
 
 ## Scenario
 
-Use the synthetic Jordan Rivera case. Ask each participant to:
+Use the seeded synthetic case. Ask each participant to:
 
 1. Upload a PDF and a phone photo, then explain what the extraction status means.
 2. Approve one extracted value, correct one, and reject one while identifying its source evidence.

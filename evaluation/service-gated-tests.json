@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    { "id": "clamav-eicar", "label": "ClamAV EICAR quarantine", "command": "npx vitest run tests/clamav.integration.test.ts", "requires": ["CLAMAV_HOST", "CLAMAV_PORT"], "owner": "operator" },
+    { "id": "ocr-quality", "label": "OCR quality corpus", "command": "npx vitest run tests/ocr-quality.integration.test.ts", "requires": ["OCR_FIXTURE_ROOT", "OCR_MIN_ACCURACY"], "owner": "QA" },
+    { "id": "ai-provider-smoke", "label": "Configured AI provider smoke tests", "command": "npx vitest run tests/provider-ai-smoke.test.ts", "requires": ["one supported provider credential"], "owner": "operator" },
+    { "id": "postgres-rls", "label": "PostgreSQL row-level isolation", "command": "npx vitest run tests/postgres-rls.integration.test.ts", "requires": ["POSTGRES_TEST_ADMIN_URL", "POSTGRES_RLS_TEST_URL"], "owner": "security" },
+    { "id": "production-worker", "label": "Production worker supervision and retry", "command": "npm run worker:once", "requires": ["production-like PostgreSQL and object storage"], "owner": "operator" },
+    { "id": "backup-restore", "label": "Disposable PostgreSQL backup restore drill", "command": "npm run backup:verify", "requires": ["pg_dump", "pg_restore", "disposable restore database", "BACKUP_ENCRYPTION_KEY"], "owner": "operator" },
+    { "id": "deployment-health", "label": "TLS deployment health and metrics", "command": "npm run healthcheck", "requires": ["APP_URL", "MONITORING_TOKEN", "deployed web and worker"], "owner": "operator" },
+    { "id": "caseworker-session", "label": "Caseworker usability session", "command": "manual protocol in docs/CASEWORKER_USABILITY_TEST.md", "requires": ["trained caseworkers", "organizational approval", "synthetic-only environment"], "owner": "product" },
+    { "id": "accessibility-manual", "label": "Manual accessibility verification", "command": "manual protocol in docs/accessibility-test-plan.md", "requires": ["keyboard", "screen reader", "200% zoom", "high contrast"], "owner": "accessibility reviewer" },
+    { "id": "external-reviews", "label": "Privacy, legal, penetration, and AI-vendor approvals", "command": "organizational review", "requires": ["authorized reviewers and signed decisions"], "owner": "organization" }
+  ]
+}

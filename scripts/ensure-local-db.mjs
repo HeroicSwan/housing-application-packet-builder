@@ -1,12 +1,11 @@
+import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
+import { resolveLocalDatabaseUrl } from "./local-database.mjs";
 
-if (!process.env.DATABASE_URL && fs.existsSync(path.resolve(process.cwd(), ".env"))) process.loadEnvFile(path.resolve(process.cwd(), ".env"));
+if ((process.env.DATA_MODE ?? "synthetic") !== "synthetic") throw new Error("Real applicant-data mode is not implemented or approved.");
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL is missing. Copy .env.example to .env before running db:setup.");
-if (url.startsWith("file:")) {
-  const value = url.slice(5);
-  const databasePath = path.isAbsolute(value) ? value : path.resolve(process.cwd(), "prisma", value);
-  fs.mkdirSync(path.dirname(databasePath), { recursive: true });
-  fs.closeSync(fs.openSync(databasePath, "a"));
-}
+const { databasePath } = resolveLocalDatabaseUrl(process.cwd(), url);
+fs.mkdirSync(path.dirname(databasePath), { recursive: true });
+fs.closeSync(fs.openSync(databasePath, "a"));

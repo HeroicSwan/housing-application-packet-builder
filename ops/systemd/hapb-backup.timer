@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily encrypted Housing Application Packet Builder backup
+
+[Timer]
+OnCalendar=*-*-* 02:15:00
+RandomizedDelaySec=900
+Persistent=true
+Unit=hapb-backup.service
+
+[Install]
+WantedBy=timers.target

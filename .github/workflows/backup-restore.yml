@@ -1,0 +1,56 @@
+name: Backup restore acceptance
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  postgresql-restore:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: hapb
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-ci-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d hapb"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:synthetic-ci-password@127.0.0.1:5432/hapb
+      DATA_MODE: synthetic
+      SESSION_SECRET: synthetic-ci-session-secret-with-more-than-32-characters
+      DATA_ENCRYPTION_KEY_ID: ci-restore
+      STORAGE_PROVIDER: local
+      LOCAL_STORAGE_ROOT: .data/restore-ci
+      PGPASSWORD: synthetic-ci-password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - name: Generate ephemeral backup key
+        run: echo "DATA_ENCRYPTION_KEY=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+      - run: npm ci
+      - run: npm run db:generate:production
+      - run: npx prisma migrate deploy --schema prisma/production/schema.prisma
+      - name: Insert synthetic restoration sentinel
+        run: node -e 'const {PrismaClient}=require("@prisma/client"); const p=new PrismaClient(); p.organization.create({data:{id:"restore-sentinel",slug:"restore-sentinel",name:"Synthetic Restore Sentinel"}}).finally(()=>p["$disconnect"]())'
+      - run: npm run backup
+      - name: Restore and verify disposable PostgreSQL target
+        run: |
+          createdb -h 127.0.0.1 -U postgres hapb_restore
+          export RESTORE_DATABASE_URL=postgresql://postgres:synthetic-ci-password@127.0.0.1:5432/hapb_restore
+          export RESTORE_CONFIRMATION=RESTORE_TO_DISPOSABLE_DATABASE
+          BACKUP_FILE=$(find .data/restore-ci/backups -type f -name '*.pgdump.enc' -print -quit)
+          npm run backup:verify -- "$BACKUP_FILE"
+          npm run backup:restore -- "$BACKUP_FILE"
+          test "$(psql "$RESTORE_DATABASE_URL" -Atc 'SELECT COUNT(*) FROM "Organization" WHERE id = '\''restore-sentinel'\'';')" = "1"
+          rm -f "$BACKUP_FILE"

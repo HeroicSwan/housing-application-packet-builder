@@ -2,19 +2,60 @@ name: CI
 on:
   push:
   pull_request:
+permissions:
+  contents: read
 jobs:
   verify:
+    name: Blocking application checks
     runs-on: ubuntu-latest
     env:
+      DATA_MODE: synthetic
       DATABASE_URL: file:./dev.db
       SESSION_SECRET: ci-session-secret-with-at-least-32-characters
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
         with: { node-version: 22, cache: npm }
-      - run: npm ci
-      - run: npm run db:setup
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm run test
-      - run: npm run build
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Generate Prisma Client
+        run: npm run db:generate
+      - name: Initialize and seed synthetic SQLite data
+        run: npm run db:setup
+      - name: Lint
+        run: npm run lint
+      - name: Type-check
+        run: npm run typecheck
+      - name: Unit and integration tests
+        run: npm test
+      - name: Production build verification
+        run: npm run build
+
+  dependency-audit:
+    name: Blocking dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --ignore-scripts
+      - run: npm run security:dependencies
+
+  sbom:
+    name: SBOM artifact
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --ignore-scripts
+      - name: Generate CycloneDX SBOM
+        run: npm sbom --sbom-format cyclonedx > sbom.cdx.json
+      - name: Upload SBOM only
+        uses: actions/upload-artifact@v6
+        with:
+          name: software-bill-of-materials
+          path: sbom.cdx.json
+          if-no-files-found: error

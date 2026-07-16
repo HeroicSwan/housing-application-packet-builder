@@ -1,4 +1,33 @@
 services:
+  database:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hapb
+      POSTGRES_USER: hapb_owner
+      POSTGRES_PASSWORD: ${POSTGRES_OWNER_PASSWORD}
+      HAPB_APP_PASSWORD: ${HAPB_APP_PASSWORD}
+      HAPB_SYSTEM_PASSWORD: ${HAPB_SYSTEM_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-production-database.sh:/docker-entrypoint-initdb.d/10-hapb-roles.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hapb_owner -d hapb"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  migrate:
+    build: .
+    restart: "no"
+    env_file: ${APP_ENV_FILE:-.env.production}
+    environment:
+      DATABASE_URL: postgresql://hapb_owner:${POSTGRES_OWNER_PASSWORD}@database:5432/hapb
+    command: ["sh", "-c", "npx prisma migrate deploy --schema prisma/production/schema.prisma && psql \"$$DATABASE_URL\" --set=ON_ERROR_STOP=1 -f scripts/grant-production-roles.sql"]
+    depends_on:
+      database:
+        condition: service_healthy
+
   app:
     build: .
     restart: unless-stopped
@@ -6,7 +35,9 @@ services:
       - "3000:3000"
     env_file: ${APP_ENV_FILE:-.env.production}
     environment:
-      DATABASE_URL: file:/app/prisma/production.db
+      DATABASE_URL: postgresql://hapb_app:${HAPB_APP_PASSWORD}@database:5432/hapb
+      SYSTEM_DATABASE_URL: postgresql://hapb_system:${HAPB_SYSTEM_PASSWORD}@database:5432/hapb
+      DATA_MODE: production
       STORAGE_PROVIDER: s3
       S3_ENDPOINT: http://object-storage:9000
       S3_REGION: us-east-1
@@ -14,13 +45,36 @@ services:
       ENFORCE_PRODUCTION_CONFIG: "true"
       MALWARE_SCANNER: clamav
       CLAMAV_HOST: malware-scanner
-    volumes:
-      - application_database:/app/prisma
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       create-bucket:
         condition: service_completed_successfully
       malware-scanner:
         condition: service_started
+
+  worker:
+    build: .
+    restart: unless-stopped
+    command: ["npm", "run", "worker"]
+    env_file: ${APP_ENV_FILE:-.env.production}
+    environment:
+      DATABASE_URL: postgresql://hapb_app:${HAPB_APP_PASSWORD}@database:5432/hapb
+      SYSTEM_DATABASE_URL: postgresql://hapb_system:${HAPB_SYSTEM_PASSWORD}@database:5432/hapb
+      DATA_MODE: production
+      STORAGE_PROVIDER: s3
+      S3_ENDPOINT: http://object-storage:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: housing-applications
+      ENFORCE_PRODUCTION_CONFIG: "true"
+      MALWARE_SCANNER: clamav
+      CLAMAV_HOST: malware-scanner
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      create-bucket:
+        condition: service_completed_successfully
+
   object-storage:
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
     restart: unless-stopped
@@ -30,11 +84,13 @@ services:
       MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY}
     volumes:
       - application_objects:/data
+
   malware-scanner:
     image: clamav/clamav:1.4
     restart: unless-stopped
     volumes:
       - antivirus_signatures:/var/lib/clamav
+
   create-bucket:
     image: minio/mc:RELEASE.2025-04-16T18-13-26Z
     depends_on:
@@ -44,24 +100,28 @@ services:
     environment:
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+
   backup:
     build: .
     restart: unless-stopped
     command: ["sh", "-c", "while true; do node scripts/backup-database.mjs; sleep 86400; done"]
     env_file: ${APP_ENV_FILE:-.env.production}
     environment:
-      DATABASE_URL: file:/app/prisma/production.db
+      DATABASE_URL: postgresql://hapb_owner:${POSTGRES_OWNER_PASSWORD}@database:5432/hapb
+      SYSTEM_DATABASE_URL: postgresql://hapb_system:${HAPB_SYSTEM_PASSWORD}@database:5432/hapb
+      DATA_MODE: production
       STORAGE_PROVIDER: s3
       S3_ENDPOINT: http://object-storage:9000
       S3_REGION: us-east-1
       S3_BUCKET: housing-applications
       ENFORCE_PRODUCTION_CONFIG: "true"
-    volumes:
-      - application_database:/app/prisma
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       create-bucket:
         condition: service_completed_successfully
+
 volumes:
-  application_database:
+  postgres_data:
   application_objects:
   antivirus_signatures:

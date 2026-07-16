@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
+const e2eRunId = process.env.E2E_RUN_ID;
+if (e2eRunId && !/^[a-z0-9][a-z0-9-]{0,76}$/.test(e2eRunId)) throw new Error("Invalid E2E_RUN_ID.");
+const temporaryDistDirectory = process.env.NEXT_TEMP_DIST_DIR;
+if (temporaryDistDirectory && !/^\.next-(?:health|open)-[a-z0-9-]{1,80}$/.test(temporaryDistDirectory)) throw new Error("Invalid NEXT_TEMP_DIST_DIR.");
+
 const nextConfig: NextConfig = {
+  ...(temporaryDistDirectory ? { distDir: temporaryDistDirectory } : e2eRunId ? { distDir: ".next-e2e" } : {}),
   output: "standalone",
   allowedDevOrigins: ["127.0.0.1"],
   experimental: {

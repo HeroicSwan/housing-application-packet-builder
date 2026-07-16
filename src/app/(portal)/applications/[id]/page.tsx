@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badge";
 import { SubmitButton } from "@/components/submit-button";
 import { calculateDraftReadiness } from "@/lib/applications/mapping";
-import { canAccessCase, requireUser } from "@/lib/auth/session";
+import { activateOrganizationContext, canAccessCase, requireUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 
 export default async function PrepareApplicationPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string }> }) {
-  const user = await requireUser(); const { id } = await params; const { error } = await searchParams;
+  const user = activateOrganizationContext(await requireUser()); const { id } = await params; const { error } = await searchParams;
   const draft = await db.applicationDraft.findUnique({ where: { id }, include: { clientCase: true, template: { include: { housingProgram: true } }, fields: { include: { templateField: true }, orderBy: { templateField: { displayOrder: "asc" } } } } });
   if (!draft || !(await canAccessCase(user, draft.clientCaseId))) notFound();
   const readiness = calculateDraftReadiness(draft.fields.map((field) => ({ required: field.templateField.required, fieldType: field.templateField.fieldType, finalValue: field.finalValue, reviewState: field.reviewState, validationState: field.validationState })));

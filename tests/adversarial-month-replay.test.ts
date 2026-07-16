@@ -1,16 +1,16 @@
-import { createServer } from "node:http";
-import type { AddressInfo } from "node:net";
 import { mkdir, writeFile } from "node:fs/promises";
 import { performance } from "node:perf_hooks";
 import { PDFDocument } from "pdf-lib";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { db } from "@/lib/db";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { db, systemDb } from "@/lib/db";
+import { enterOrganizationContext } from "@/lib/tenant-context";
 import { buildCanonicalApplicationData, createOrRefreshDraft } from "@/lib/applications/service";
 import { generateApplicationOutput } from "@/lib/applications/output";
 import { generateSupportingPacketPdf } from "@/lib/applications/pdf";
 import { normalizeMonthlyIncome } from "@/lib/applications/income";
 import { encryptText } from "@/lib/security/encryption";
 import { deliverApplication } from "@/lib/submissions";
+import { computeDraftContentDigest } from "@/lib/applications/integrity";
 
 const RUN = `ADVERSARIAL-${Date.now()}`;
 const CASE_COUNT = Math.max(1, Number(process.env.REPLAY_CASE_COUNT ?? 31));
@@ -24,13 +24,18 @@ const names = [
 ];
 
 let stressUser: { id: string } | undefined;
+let organization: { id: string } | undefined;
 let program: { id: string } | undefined;
 let template: { id: string; version: number } | undefined;
-let providerServer: ReturnType<typeof createServer> | undefined;
 const providerRequests: { headers: Record<string, string | string[] | undefined>; body: string }[] = [];
 let destination: { id: string } | undefined;
 const caseIds: string[] = [];
 const draftIds: string[] = [];
+
+vi.mock("@/lib/security/safe-http", () => ({ postPinnedJson: vi.fn(async (_url: string, body: unknown, options: { headers: Record<string, string> }) => {
+  providerRequests.push({ headers: options.headers, body: JSON.stringify(body) });
+  return { status: 200, requestId: "SYNTHETIC-ACCEPTED-001" };
+}) }));
 
 const templateFields = [
   ["applicant_name", "Applicant legal name", "TEXT", true, "client.legalName", "Applicant.Name"],
@@ -92,6 +97,8 @@ async function createEvidence(caseId: string, index: number) {
 
 describe("adversarial synthetic month replay", () => {
   beforeAll(async () => {
+    organization = await systemDb.organization.create({ data: { slug: RUN.toLowerCase(), name: "Synthetic QA Agency" } });
+    enterOrganizationContext(organization.id);
     stressUser = await db.user.create({ data: { name: "Synthetic Stress Runner", email: `${RUN.toLowerCase()}@example.test`, passwordHash: "not-used", role: "ADMIN" } });
     program = await db.housingProgram.create({ data: { name: `${RUN} Program`, organization: "Synthetic QA Agency", description: "Synthetic stress-test program", isActive: true } });
     template = await db.applicationTemplate.create({
@@ -101,14 +108,7 @@ describe("adversarial synthetic month replay", () => {
       },
     });
 
-    providerServer = createServer((request, response) => {
-      const chunks: Buffer[] = [];
-      request.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-      request.on("end", () => { providerRequests.push({ headers: request.headers, body: Buffer.concat(chunks).toString("utf8") }); response.writeHead(200, { "content-type": "application/json" }); response.end(JSON.stringify({ id: "SYNTHETIC-ACCEPTED-001", message: "Synthetic provider accepted packet" })); });
-    });
-    await new Promise<void>((resolve) => providerServer!.listen(0, "127.0.0.1", resolve));
-    const port = (providerServer.address() as AddressInfo).port;
-    destination = await db.submissionDestination.create({ data: { housingProgramId: program.id, name: `${RUN} Provider Stub`, type: "PORTAL_API", endpoint: `http://127.0.0.1:${port}/submit`, configEncrypted: encryptText(JSON.stringify({ authToken: "synthetic-token" })) } });
+    destination = await db.submissionDestination.create({ data: { housingProgramId: program.id, name: `${RUN} Provider Stub`, type: "PORTAL_API", endpoint: "https://provider.example.test/submit", configEncrypted: encryptText(JSON.stringify({ authToken: "synthetic-token" })) } });
 
     for (let index = 0; index < CASE_COUNT; index += 1) {
       const legalName = names[index % names.length];
@@ -121,16 +121,18 @@ describe("adversarial synthetic month replay", () => {
   }, 120000);
 
   afterAll(async () => {
-    if (providerServer) await new Promise<void>((resolve) => providerServer!.close(() => resolve()));
+    if (organization) enterOrganizationContext(organization.id);
     if (caseIds.length) await db.clientCase.deleteMany({ where: { id: { in: caseIds } } });
     if (program) await db.applicationTemplate.deleteMany({ where: { housingProgramId: program.id } });
     if (program) await db.submissionDestination.deleteMany({ where: { housingProgramId: program.id } });
     if (program) await db.housingProgram.delete({ where: { id: program.id } });
-    if (stressUser) { await db.auditEvent.deleteMany({ where: { userId: stressUser.id } }); await db.user.delete({ where: { id: stressUser.id } }); }
+    if (stressUser) { await systemDb.auditEvent.deleteMany({ where: { userId: stressUser.id } }); await db.user.delete({ where: { id: stressUser.id } }); }
+    if (organization) await systemDb.organization.delete({ where: { id: organization.id } });
     await db.$disconnect();
   });
 
   it("replays 31 complex cases through review, versioning, PDF generation, and provider delivery", async () => {
+    enterOrganizationContext(organization!.id);
     const started = performance.now();
     let conflictCases = 0;
     let expiredCases = 0;
@@ -160,7 +162,8 @@ describe("adversarial synthetic month replay", () => {
       await db.consentRecord.create({ data: { clientCaseId: caseId, draftId: draft.id, consentType: "DOCUMENT_RELEASE", version: "synthetic-stress-v1", granted: true, recordedById: stressUser!.id } });
       draft = await createOrRefreshDraft(caseId, template!.id, stressUser!.id);
       expect(draft.status).toBe("READY_TO_GENERATE");
-      await db.applicationDraft.update({ where: { id: draft.id }, data: { status: "APPROVED", generatedAt: new Date(), generationVersion: 1 } });
+      const approvedDigest = await computeDraftContentDigest(draft.id);
+      await db.applicationDraft.update({ where: { id: draft.id }, data: { status: "APPROVED", generatedAt: new Date(), generationVersion: 1, approvedDigest } });
       draftIds.push(draft.id);
 
       const output = await generateApplicationOutput(draft.id);
@@ -187,9 +190,9 @@ describe("adversarial synthetic month replay", () => {
     const secondDelivery = await deliverApplication(deliverableDraftId, destination!.id);
     expect(firstDelivery.status).toBe("SUBMITTED");
     expect(secondDelivery.status).toBe("SUBMITTED");
-    expect(secondDelivery.attempts).toBe(2);
-    expect(providerRequests).toHaveLength(2);
-    expect(providerRequests[0].headers["idempotency-key"]).toBe(providerRequests[1].headers["idempotency-key"]);
+    expect(secondDelivery.attempts).toBe(1);
+    expect(providerRequests).toHaveLength(1);
+    expect(providerRequests[0].headers["idempotency-key"]).toBeTruthy();
     const providerPayload = JSON.parse(providerRequests[0].body) as { applicationPdfBase64: string; supportingPacketPdfBase64: string };
     expect((await PDFDocument.load(Buffer.from(providerPayload.applicationPdfBase64, "base64"))).getPageCount()).toBeGreaterThan(0);
     expect((await PDFDocument.load(Buffer.from(providerPayload.supportingPacketPdfBase64, "base64"))).getPageCount()).toBeGreaterThan(1);

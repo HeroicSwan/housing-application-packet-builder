@@ -1,7 +1,36 @@
+import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { countApplicationRows } from "../scripts/application-data.mjs";
+import { resolveE2eDatabaseUrl } from "../scripts/e2e-database.mjs";
+import { resolveLocalDatabaseUrl } from "../scripts/local-database.mjs";
+
+const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const databaseUrl = process.env.DATABASE_URL;
+const dataMode = process.env.DATA_MODE ?? "synthetic";
+const seedContext = process.env.SYNTHETIC_SEED_CONTEXT;
+const syntheticOrganizationId = "synthetic-demo-organization";
+if (!databaseUrl) throw new Error("DATABASE_URL is required for synthetic seeding.");
+if (dataMode !== "synthetic") throw new Error("Real applicant-data mode is not implemented or approved.");
+if (seedContext === "e2e") {
+  if (process.env.E2E_DATABASE_URL !== databaseUrl) throw new Error("The E2E seed requires matching isolated database settings.");
+  resolveE2eDatabaseUrl(repositoryRoot, databaseUrl);
+} else if (["local-empty", "local-reset"].includes(seedContext)) {
+  resolveLocalDatabaseUrl(repositoryRoot, databaseUrl);
+} else {
+  throw new Error("Destructive synthetic seeding must run through db:setup, db:reset, or test:e2e.");
+}
 
 const db = new PrismaClient();
+if (seedContext === "local-empty") {
+  const existingRows = await countApplicationRows(db);
+  if (existingRows) {
+    await db.$disconnect();
+    throw new Error("The preserving local seed requires an empty synthetic database.");
+  }
+}
 const passwordHash = await bcrypt.hash("DemoHousing2026!", 10);
 
 await db.auditEvent.deleteMany();
@@ -30,12 +59,19 @@ await db.passwordResetToken.deleteMany();
 await db.rateLimitBucket.deleteMany();
 await db.backupRun.deleteMany();
 await db.user.deleteMany();
+await db.organization.deleteMany();
+
+const ownerOrganization = await db.organization.create({ data: {
+  id: syntheticOrganizationId,
+  slug: "synthetic-housing-demo",
+  name: "Synthetic Housing Demonstration",
+} });
 
 const [caseworker, reviewer] = await Promise.all([
-  db.user.create({ data: { name: "Maya Ortiz", email: "caseworker@example.org", role: "CASEWORKER", passwordHash } }),
-  db.user.create({ data: { name: "Daniel Cho", email: "reviewer@example.org", role: "REVIEWER", passwordHash } }),
+  db.user.create({ data: { organizationId: ownerOrganization.id, name: "Maya Ortiz", email: "caseworker@example.org", role: "CASEWORKER", passwordHash } }),
+  db.user.create({ data: { organizationId: ownerOrganization.id, name: "Daniel Cho", email: "reviewer@example.org", role: "REVIEWER", passwordHash } }),
 ]);
-await db.user.create({ data: { name: "Priya Shah", email: "admin@example.org", role: "ADMIN", passwordHash } });
+await db.user.create({ data: { organizationId: ownerOrganization.id, name: "Priya Shah", email: "admin@example.org", role: "ADMIN", passwordHash } });
 
 const requirementSets = {
   harbor: [
@@ -67,7 +103,7 @@ const requirementSets = {
 async function createProgram(name, organization, description, rows) {
   return db.housingProgram.create({
     data: {
-      name, organization, description, fictional: true, isActive: true,
+      organizationId: ownerOrganization.id, name, organization, description, fictional: true, isActive: true,
       incomeLimitNotes: "Income is reviewed by qualified program staff; this tool does not determine eligibility.",
       contactInformation: "Demonstration contact only — programs and organizations are fictional.",
       requirements: { create: rows.map(([requirementName, category, isRequired, expirationPeriodDays], sortOrder) => ({
@@ -152,7 +188,7 @@ const caseRows = [
 const cases = [];
 for (const [referenceNumber, preferredName, legalName, status, selectedProgramId, currentLivingSituation] of caseRows) {
   cases.push(await db.clientCase.create({ data: {
-    referenceNumber, preferredName, legalName, status, selectedProgramId, currentLivingSituation,
+    organizationId: ownerOrganization.id, referenceNumber, preferredName, legalName, status, selectedProgramId, currentLivingSituation,
     assignedCaseworkerId: caseworker.id, preferredLanguage: "English", dateOfBirth: new Date("1988-06-14"),
   } }));
 }
@@ -286,14 +322,14 @@ const approvedPacket = await packetFor(cases[3], harbor, "APPROVED", 2, 0);
 await db.reviewNote.create({ data: { packetId: conflictPacket.id, authorId: reviewer.id, note: "Please confirm the legal name shown on the income document before resubmission." } });
 
 for (const clientCase of cases) {
-  await db.auditEvent.create({ data: { userId: caseworker.id, clientCaseId: clientCase.id, action: "CASE_CREATED", entityType: "ClientCase", entityId: clientCase.id, metadata: "Synthetic demonstration case created" } });
+  await db.auditEvent.create({ data: { organizationId: ownerOrganization.id, userId: caseworker.id, clientCaseId: clientCase.id, action: "CASE_CREATED", entityType: "ClientCase", entityId: clientCase.id, metadata: "Synthetic demonstration case created" } });
 }
 await db.auditEvent.createMany({ data: [
-  { userId: caseworker.id, clientCaseId: cases[1].id, action: "DOCUMENT_UPLOADED", entityType: "UploadedDocument", entityId: idDoc.id, metadata: "Identity document processed by mock provider" },
-  { userId: caseworker.id, clientCaseId: cases[2].id, action: "DOCUMENT_UPLOADED", entityType: "UploadedDocument", entityId: conflictDoc.id, metadata: "Income document processed by mock provider" },
-  { userId: caseworker.id, clientCaseId: cases[1].id, action: "PACKET_GENERATED", entityType: "ApplicationPacket", entityId: readyPacket.id, metadata: "Packet version 1 generated" },
-  { userId: reviewer.id, clientCaseId: cases[2].id, action: "PACKET_RETURNED", entityType: "ApplicationPacket", entityId: conflictPacket.id, metadata: "Returned with correction note" },
-  { userId: reviewer.id, clientCaseId: cases[3].id, action: "PACKET_APPROVED", entityType: "ApplicationPacket", entityId: approvedPacket.id, metadata: "Packet version 2 approved" },
+  { organizationId: ownerOrganization.id, userId: caseworker.id, clientCaseId: cases[1].id, action: "DOCUMENT_UPLOADED", entityType: "UploadedDocument", entityId: idDoc.id, metadata: "Identity document processed by mock provider" },
+  { organizationId: ownerOrganization.id, userId: caseworker.id, clientCaseId: cases[2].id, action: "DOCUMENT_UPLOADED", entityType: "UploadedDocument", entityId: conflictDoc.id, metadata: "Income document processed by mock provider" },
+  { organizationId: ownerOrganization.id, userId: caseworker.id, clientCaseId: cases[1].id, action: "PACKET_GENERATED", entityType: "ApplicationPacket", entityId: readyPacket.id, metadata: "Packet version 1 generated" },
+  { organizationId: ownerOrganization.id, userId: reviewer.id, clientCaseId: cases[2].id, action: "PACKET_RETURNED", entityType: "ApplicationPacket", entityId: conflictPacket.id, metadata: "Returned with correction note" },
+  { organizationId: ownerOrganization.id, userId: reviewer.id, clientCaseId: cases[3].id, action: "PACKET_APPROVED", entityType: "ApplicationPacket", entityId: approvedPacket.id, metadata: "Packet version 2 approved" },
 ] });
 
 console.log("Seeded synthetic demonstration data and accounts.");

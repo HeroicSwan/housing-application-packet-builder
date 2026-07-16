@@ -7,11 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
 import { StatusBadge } from "@/components/status-badge";
-import { canAccessCase, requireRole } from "@/lib/auth/session";
+import { activateOrganizationContext, canAccessCase, requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 
 export default async function RemainingQuestionsPage({ params }: { params: Promise<{ id: string }> }) {
-  const user = await requireRole(["CASEWORKER"]); const { id } = await params;
+  const user = activateOrganizationContext(await requireRole(["CASEWORKER"])); const { id } = await params;
   const draft = await db.applicationDraft.findUnique({ where: { id }, include: { clientCase: true, template: true, fields: { include: { templateField: true }, orderBy: { templateField: { displayOrder: "asc" } } } } });
   if (!draft || !(await canAccessCase(user, draft.clientCaseId))) notFound();
   const unresolved = draft.fields.filter((field) => ["NEEDS_ANSWER", "CONFLICT", "EXPIRED", "AWAITING_CONFIRMATION"].includes(field.reviewState) || ["MISSING", "INVALID", "CONFLICT", "EXPIRED"].includes(field.validationState));

@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { DemoBanner } from "@/components/demo-banner";
+import { env } from "@/lib/env";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,7 +15,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full">
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        {env.DEMO_BANNER ? <DemoBanner /> : null}
+        {children}
+      </body>
     </html>
   );
 }

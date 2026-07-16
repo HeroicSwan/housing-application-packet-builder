@@ -1,0 +1,107 @@
+{
+  "documentType": "codex-security.hardening-analysis",
+  "schemaVersion": "1.0",
+  "analysisId": "hardening_20260715_hapb",
+  "sourceEvidence": {
+    "kind": "source_and_document_collection",
+    "label": "Housing Application Packet Builder readiness evidence",
+    "collectionSha256": "8f556335510d16af616ad77f8e62ea135dad92a25ed0ffbcb781548256da3109",
+    "artifactCount": 14,
+    "targetRevision": "50fae62b6354a937d66ea9d3b298848611b97323",
+    "sourceDrift": "present"
+  },
+  "assessment": {
+    "outcome": "opportunities_identified",
+    "summary": "One cross-cutting tenant request-boundary opportunity was validated and its incremental option implemented."
+  },
+  "constraints": {
+    "profile": "balanced",
+    "changeHorizons": ["incremental", "medium_term"],
+    "nonNegotiables": [
+      "Preserve local Node/npm/SQLite development without Docker.",
+      "Keep production PostgreSQL row-level security as defense in depth.",
+      "Fail closed when organization scope is absent."
+    ],
+    "assumptions": ["No measured request-latency or memory budget was supplied."]
+  },
+  "opportunities": [
+    {
+      "opportunityId": "tenant-request-boundary",
+      "title": "Make tenant request authority explicit",
+      "summary": "Ensure every authenticated page, action, and API route activates organization authority in its own async caller.",
+      "diagnosis": "The database correctly failed closed, but organization authority was previously entered inside an awaited helper and did not survive into the caller continuation.",
+      "evidence": [
+        {"claimType":"observed","sourceKind":"source","evidenceId":"E-TENANT-SESSION","path":"src/lib/auth/session.ts","claim":"Authentication resolves and validates the session organization before tenant access."},
+        {"claimType":"observed","sourceKind":"source","evidenceId":"E-TENANT-DB","path":"src/lib/tenant-database.ts","claim":"Every tenant Prisma operation requires organization context and adds model scope."},
+        {"claimType":"observed","sourceKind":"experiment","evidenceId":"E-BROWSER-CONTEXT","path":"tests/e2e/accessibility.spec.ts","claim":"The pre-fix caseworker dashboard failed closed because the caller had no organization context."},
+        {"claimType":"inferred","sourceKind":"source","evidenceId":"E-CONTEXT-CONVENTION","path":"src/app","claim":"Ambient authority can drift when request boundaries do not activate context after authentication awaits."}
+      ],
+      "desiredInvariants": [
+        "Every authenticated request boundary activates exactly the organization validated by its live session before tenant database access.",
+        "Missing organization authority fails closed.",
+        "Production database RLS and application-layer scope agree on the organization identifier.",
+        "New authenticated handlers cannot enter CI without the activation pattern."
+      ],
+      "proposalPath": "proposals/tenant-request-boundary.md",
+      "options": [
+        {
+          "optionId": "caller-bound-activation",
+          "title": "Caller-bound activation with a static guard",
+          "kind": "incremental",
+          "summary": "Activate context synchronously in each authenticated caller and enforce coverage in tests.",
+          "diagramPaths": {"before":"diagrams/tenant-request-boundary-before.mmd","after":"diagrams/tenant-request-boundary-caller-bound-activation-after.mmd"},
+          "evidenceCoverage": [
+            {"evidenceId":"E-BROWSER-CONTEXT","effect":"addresses","tacticalFixRequired":false,"rationale":"The caller now owns activation and the browser workflow passes."},
+            {"evidenceId":"E-CONTEXT-CONVENTION","effect":"mitigates","tacticalFixRequired":true,"rationale":"The CI guard detects omission, while authority remains ambient within the activated caller."}
+          ],
+          "tradeoffs": [
+            {"dimension":"security","direction":"improves","confidence":"high","basis":"measured","assessment":"The reproduced missing-context path now succeeds only after explicit activation, while absent context still fails closed.","validationPlan":"Run tenant isolation, auth-boundary, and Playwright suites."},
+            {"dimension":"performance","direction":"neutral","confidence":"high","basis":"source-derived","assessment":"Activation is one AsyncLocalStorage operation with no database or network hop.","validationPlan":"Compare dashboard request latency if a performance budget is later established."},
+            {"dimension":"memory","direction":"neutral","confidence":"high","basis":"source-derived","assessment":"The change stores one existing organization identifier in the request async context.","validationPlan":"Observe process RSS during the existing browser suite."},
+            {"dimension":"reliability","direction":"improves","confidence":"high","basis":"measured","assessment":"All six browser workflows pass and missing activation is caught before runtime by a source guard.","validationPlan":"Keep the boundary guard and E2E workflow required in CI."},
+            {"dimension":"operability","direction":"neutral","confidence":"medium","basis":"source-derived","assessment":"No service is added; failures retain the existing safe workspace error behavior.","validationPlan":"Alert on repeated portal render failures in deployed logs."},
+            {"dimension":"migration","direction":"improves","confidence":"high","basis":"measured","assessment":"Existing service APIs remain unchanged and current callers were mechanically migrated and type-checked.","validationPlan":"Reject any unactivated authenticated caller in CI."}
+          ],
+          "residualRisks": ["Ambient organization authority remains available to all tenant services called within an activated request."],
+          "implementationReadiness": {
+            "affectedComponents": ["src/lib/auth/session.ts", "src/app", "tests/auth-context-boundary.test.ts"],
+            "workPackages": ["Add synchronous activation helper.", "Activate every authenticated caller.", "Add static boundary guard and browser regression coverage."],
+            "acceptanceCriteria": ["No authenticated app caller awaits authentication without activation.", "All tenant and Playwright tests pass."],
+            "migrationNotes": ["No data migration is required."],
+            "rollback": "Revert caller changes only with a replacement organization-authority mechanism; otherwise authenticated tenant access fails closed."
+          }
+        },
+        {
+          "optionId": "capability-scoped-client",
+          "title": "Capability-scoped organization database client",
+          "kind": "structural",
+          "summary": "Pass an organization-bound database capability through services instead of ambient request context.",
+          "diagramPaths": {"before":"diagrams/tenant-request-boundary-before.mmd","after":"diagrams/tenant-request-boundary-capability-scoped-client-after.mmd"},
+          "evidenceCoverage": [
+            {"evidenceId":"E-BROWSER-CONTEXT","effect":"addresses","tacticalFixRequired":true,"rationale":"Bound clients remove the missing ambient context, but caller activation remains necessary during migration."},
+            {"evidenceId":"E-CONTEXT-CONVENTION","effect":"addresses","tacticalFixRequired":true,"rationale":"Organization authority becomes a typed service dependency rather than a convention."}
+          ],
+          "tradeoffs": [
+            {"dimension":"security","direction":"improves","confidence":"high","basis":"source-derived","assessment":"Tenant authority is explicit and can be narrowed per service, reducing ambient-authority drift.","validationPlan":"Prove no tenant service imports the global tenant client and rerun cross-organization tests."},
+            {"dimension":"performance","direction":"neutral","confidence":"medium","basis":"hypothetical","assessment":"Prisma can share the underlying pool, but wrapper construction and parameter plumbing need measurement.","validationPlan":"Compare p50 and p95 dashboard and packet-generation latency on identical PostgreSQL data."},
+            {"dimension":"memory","direction":"neutral","confidence":"medium","basis":"hypothetical","assessment":"Bound wrappers should be lightweight if they share one client; accidental per-request pools would regress memory sharply.","validationPlan":"Assert one underlying Prisma pool and compare peak RSS under concurrent requests."},
+            {"dimension":"reliability","direction":"improves","confidence":"medium","basis":"source-derived","assessment":"Typed authority removes async-context loss but a broad migration can introduce service wiring errors.","validationPlan":"Migrate one vertical slice at a time behind compatibility tests."},
+            {"dimension":"operability","direction":"neutral","confidence":"medium","basis":"source-derived","assessment":"Runtime operations stay in-process; developer tracing improves because organization authority is visible in call signatures.","validationPlan":"Review error telemetry during a staged dual-path rollout."},
+            {"dimension":"migration","direction":"regresses","confidence":"high","basis":"source-derived","assessment":"Pages, actions, API routes, jobs, and application services must accept or construct the capability.","validationPlan":"Inventory imports and require zero direct global tenant-client imports before cutover."}
+          ],
+          "residualRisks": ["System-level clients remain privileged and must retain narrow database grants.", "Incorrect capability construction can still select the wrong organization unless bound only from validated sessions or worker iteration."],
+          "implementationReadiness": {
+            "affectedComponents": ["src/lib/db.ts", "src/lib/tenant-database.ts", "src/app", "src/lib/applications", "src/lib/jobs"],
+            "workPackages": ["Define an organization-bound client type.", "Migrate one request vertical slice.", "Remove global tenant-client imports.", "Retain RLS parity tests."],
+            "acceptanceCriteria": ["Tenant services require an explicit bound capability.", "No cross-organization read or write succeeds in SQLite or PostgreSQL."],
+            "migrationNotes": ["Use caller-bound activation until every service is migrated."],
+            "rollback": "Retain the current activated-context path until the capability migration is complete and validated."
+          }
+        }
+      ],
+      "recommendedOptionId": "caller-bound-activation",
+      "recommendation": "Use caller-bound activation for the current release; choose capability-scoped clients before adding plugins or independent application services."
+    }
+  ],
+  "openQuestions": ["At what service count or extension boundary should capability-scoped clients become mandatory?"]
+}

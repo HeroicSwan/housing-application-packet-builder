@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Download, FileJson, Send } from "lucide-react";
-import { submitPacketAction } from "@/app/actions/packets";
+import { createSecurePacketDownloadAction, submitPacketAction } from "@/app/actions/packets";
 import { db } from "@/lib/db";
-import { canAccessPacket, requireUser } from "@/lib/auth/session";
+import { activateOrganizationContext, canAccessPacket, requireUser } from "@/lib/auth/session";
 import { parsePacketSnapshot } from "@/lib/packets/snapshot";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -12,12 +12,12 @@ import { PrintButton } from "@/components/print-button";
 import { formatDate } from "@/lib/format";
 
 export default async function PacketPreviewPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ submitted?: string; notice?: string }> }) {
-  const user = await requireUser(); const { id } = await params; const messages = await searchParams; if (!(await canAccessPacket(user, id))) notFound();
+  const user = activateOrganizationContext(await requireUser()); const { id } = await params; const messages = await searchParams; if (!(await canAccessPacket(user, id))) notFound();
   const packet = await db.applicationPacket.findUnique({ where: { id }, include: { fields: true, reviewNotes: { include: { author: true }, orderBy: { createdAt: "asc" } }, requirementOverrides: { include: { reviewer: true }, orderBy: { createdAt: "asc" } }, approvedBy: true } }); if (!packet) notFound();
   let snapshot; try { snapshot = parsePacketSnapshot(packet.snapshotJson); } catch { notFound(); }
   const submitAction = submitPacketAction.bind(null, id);
   return <div>
-    <div className="no-print flex flex-wrap items-center justify-between gap-4 border-b pb-5"><div><Link href={`/cases/${packet.clientCaseId}/packet`} className="text-sm font-semibold text-primary underline underline-offset-4">Back to case</Link><h1 className="mt-2 text-3xl font-semibold tracking-tight">Review summary preview</h1><p className="mt-1 text-sm text-muted-foreground">Internal case snapshot - not the completed housing application.</p></div><div className="flex flex-wrap gap-2"><Button asChild variant="outline"><a href={`/api/packets/${id}/json`}><FileJson /> JSON</a></Button><Button asChild variant="outline"><a href={`/api/packets/${id}/pdf`}><Download /> PDF</a></Button><PrintButton />{packet.status === "DRAFT" && user.role === "CASEWORKER" && <form action={submitAction}><SubmitButton pendingLabel="Submitting…"><Send /> Submit for review</SubmitButton></form>}{user.role === "REVIEWER" && packet.status !== "DRAFT" && <Button asChild><Link href={`/review/${id}`}>Open review</Link></Button>}</div></div>
+    <div className="no-print flex flex-wrap items-center justify-between gap-4 border-b pb-5"><div><Link href={`/cases/${packet.clientCaseId}/packet`} className="text-sm font-semibold text-primary underline underline-offset-4">Back to case</Link><h1 className="mt-2 text-3xl font-semibold tracking-tight">Review summary preview</h1><p className="mt-1 text-sm text-muted-foreground">Internal case snapshot - not the completed housing application.</p></div><div className="flex flex-wrap gap-2"><Button asChild variant="outline"><a href={`/api/packets/${id}/json`}><FileJson /> JSON</a></Button><Button asChild variant="outline"><a href={`/api/packets/${id}/pdf`}><Download /> PDF</a></Button>{packet.status === "APPROVED" && <form action={createSecurePacketDownloadAction.bind(null, id)}><SubmitButton variant="outline" pendingLabel="Creating…"><Download /> One-use 15-minute link</SubmitButton></form>}<PrintButton />{packet.status === "DRAFT" && user.role === "CASEWORKER" && <form action={submitAction}><SubmitButton pendingLabel="Submitting…"><Send /> Submit for review</SubmitButton></form>}{["REVIEWER", "SUPERVISOR", "AUDITOR"].includes(user.role) && packet.status !== "DRAFT" && <Button asChild><Link href={`/review/${id}`}>Open review</Link></Button>}</div></div>
     {messages.submitted && <div role="status" className="no-print mt-5 border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900">Packet version {packet.version} was submitted for human review.</div>}
     {messages.notice && <div role="status" className="no-print mt-5 border border-blue-300 bg-blue-50 p-4 text-sm text-blue-900">{messages.notice}</div>}
     <div className="no-print mt-5 border border-zinc-300 bg-white p-4 text-sm"><strong>Snapshot notice:</strong> This preview shows the source data captured on {formatDate(snapshot.generatedAt)}. Later case edits do not change this packet version.</div>

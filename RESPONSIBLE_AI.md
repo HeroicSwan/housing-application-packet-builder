@@ -1,19 +1,25 @@
 # Responsible AI
 
-Document processing is an assistive transcription step, not an authority. The default deterministic mock processor works without an API key. The optional Anthropic PDF adapter may propose structured fields with confidence and page/source references. Its output is schema-validated, every proposal begins pending, and a person can approve, edit, or reject it while the original proposal remains stored.
+Document processing is assistive transcription, not an authority. Phase 0 permits synthetic demonstration documents only and is not approved for real applicant information.
+
+## Current behavior
+
+The default mock processor is deterministic and requires no provider account. Optional server-side adapters can send synthetic PDFs or images to configured Anthropic, Gemini, Groq, OpenRouter, SambaNova, Cerebras, or Mistral services. Provider output is schema-validated and begins as a proposal that staff can approve, correct, or reject.
+
+Reviewed human values are not silently replaced by later provider output. Deterministic application and requirement rules remain separate from AI proposals.
 
 ## Human review
 
-Qualified staff must compare extracted values to the source, resolve inconsistencies, confirm program policy, and decide whether a packet is ready. A reviewed human value is never silently replaced by later AI output; retries are limited to failed processing records. Uncertainty is shown as a confidence percentage plus source evidence; low confidence is not converted into an eligibility score. Requirement matching and packet approval use deterministic code and immutable packet snapshots.
+Staff must compare each proposal with its synthetic source, resolve conflicts, confirm program rules, review generated forms, and make submission decisions. Confidence values are review aids, not eligibility or credibility scores.
 
 ## Prohibited uses
 
-Do not use this system to determine eligibility, rank or prioritize clients, infer protected traits, assess credibility, make legal conclusions, replace client consent, or submit a packet without human review. Do not train models on client documents without explicit authority and a reviewed agreement.
+Do not use the project to process real applicant information, determine eligibility, rank people, infer protected traits, assess credibility, make legal conclusions, replace consent, train on documents without authority, or submit an application without human review.
 
-## Risks
+## Risks and missing evidence
 
-Extraction can miss text, misread names and dates, confuse household members, omit signatures, invent structure, or lose page context. Errors can delay housing access or misrepresent a person. Deterministic inconsistency checks also have limits: they create review items, never accusations or automatic rejection.
+Models can omit text, confuse people or periods, misread amounts and dates, invent structure, or lose page context. Documents may also contain prompt injection or malicious content. Phase 0 has no representative OCR benchmark, malicious-document evaluation, AI-vendor approval, or production monitoring evidence.
 
-## Before nonprofit deployment
+## Future evaluation
 
-Test on synthetic and consented representative documents; measure error rates by field and document type; include accessibility and language scenarios; define confidence and escalation policy; conduct staff usability studies; red-team prompt injection inside documents; review the provider’s retention and training terms; verify human override behavior; monitor errors without logging sensitive content; and obtain legal, privacy, security, program-policy, and frontline-staff approval.
+Any future proposal must evaluate field-level accuracy, document types, accessibility and language scenarios, prompt injection, provider retention and training terms, regional processing, human override behavior, incident escalation, and safe monitoring. See [docs/data-handling.md](./docs/data-handling.md) and [docs/version-1-criteria.md](./docs/version-1-criteria.md).

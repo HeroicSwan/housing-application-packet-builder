@@ -1,13 +1,36 @@
 import { db } from "@/lib/db";
-import { requireRole } from "@/lib/auth/session";
+import { activateOrganizationContext, requireRole } from "@/lib/auth/session";
 import { formatDate } from "@/lib/format";
 import { createStaffUserAction, updateStaffUserAction } from "@/app/actions/admin";
 import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export default async function DemoUsersPage() {
-  await requireRole(["ADMIN"]);
+const roles = ["CASEWORKER", "REVIEWER", "SUPERVISOR", "AUDITOR", "SUPPORT_READ_ONLY", "ADMIN"];
+
+export default async function StaffUsersPage() {
+  activateOrganizationContext(await requireRole(["ADMIN"]));
   const users = await db.user.findMany({ select: { id: true, name: true, email: true, role: true, isActive: true, mfaEnabled: true, createdAt: true }, orderBy: { role: "asc" } });
-  return <div><p className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">Administration</p><h1 className="mt-2 text-3xl font-semibold tracking-[-0.03em]">Staff access</h1><p className="mt-2 text-sm text-muted-foreground">Invite staff, assign the least-privilege role, deactivate access, and confirm MFA enrollment.</p><div className="mt-8 divide-y border">{users.map((user) => <form action={updateStaffUserAction.bind(null, user.id)} key={user.id} className="grid items-end gap-3 p-4 lg:grid-cols-[1fr_1fr_170px_auto_auto]"><div><div className="font-medium">{user.name}</div><div className="text-xs text-muted-foreground">Created {formatDate(user.createdAt)}</div></div><div className="text-sm">{user.email}</div><div className="space-y-1"><Label htmlFor={`role-${user.id}`}>Role</Label><select id={`role-${user.id}`} name="role" defaultValue={user.role} className="h-9 w-full border bg-white px-3 text-sm"><option>CASEWORKER</option><option>REVIEWER</option><option>ADMIN</option></select></div><label className="mb-2 flex items-center gap-2 text-sm"><input type="checkbox" name="isActive" defaultChecked={user.isActive} /> Active</label><div><div className="mb-2 text-xs text-muted-foreground">MFA {user.mfaEnabled ? "enabled" : "not enabled"}</div><SubmitButton size="sm" variant="outline" pendingLabel="Saving…">Save access</SubmitButton></div></form>)}</div><section className="mt-10 border-t pt-8"><h2 className="text-xl font-semibold">Invite staff member</h2><p className="mt-2 text-sm text-muted-foreground">The invitation email contains a one-use password setup link that expires after 24 hours.</p><form action={createStaffUserAction} className="mt-5 grid gap-4 border bg-white p-5 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_180px_auto]"><div className="space-y-2"><Label htmlFor="invite-name">Name</Label><Input id="invite-name" name="name" required /></div><div className="space-y-2"><Label htmlFor="invite-email">Email</Label><Input id="invite-email" name="email" type="email" required /></div><div className="space-y-2"><Label htmlFor="invite-role">Role</Label><select id="invite-role" name="role" className="h-9 w-full border bg-white px-3 text-sm"><option>CASEWORKER</option><option>REVIEWER</option><option>ADMIN</option></select></div><div className="flex items-end"><SubmitButton pendingLabel="Inviting…">Send invitation</SubmitButton></div></form></section></div>;
+  return <div>
+    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">Administration</p>
+    <h1 className="mt-2 text-3xl font-semibold tracking-[-0.03em]">Staff access</h1>
+    <p className="mt-2 text-sm text-muted-foreground">Invite staff, assign the least-privilege role, deactivate access, and confirm MFA enrollment.</p>
+    <div className="mt-8 divide-y border">{users.map((user) => <form action={updateStaffUserAction.bind(null, user.id)} key={user.id} className="grid items-end gap-3 p-4 lg:grid-cols-[1fr_1fr_190px_auto_auto]">
+      <div><div className="font-medium">{user.name}</div><div className="text-xs text-muted-foreground">Created {formatDate(user.createdAt)}</div></div>
+      <div className="text-sm">{user.email}</div>
+      <div className="space-y-1"><Label htmlFor={`role-${user.id}`}>Role</Label><select id={`role-${user.id}`} name="role" defaultValue={user.role} className="h-9 w-full border bg-white px-3 text-sm">{roles.map((role) => <option key={role}>{role}</option>)}</select></div>
+      <label className="mb-2 flex items-center gap-2 text-sm"><input type="checkbox" name="isActive" defaultChecked={user.isActive} /> Active</label>
+      <div><div className="mb-2 text-xs text-muted-foreground">MFA {user.mfaEnabled ? "enabled" : "not enabled"}</div><SubmitButton size="sm" variant="outline" pendingLabel="Saving…">Save access</SubmitButton></div>
+    </form>)}</div>
+    <section className="mt-10 border-t pt-8">
+      <h2 className="text-xl font-semibold">Invite staff member</h2>
+      <p className="mt-2 text-sm text-muted-foreground">The invitation email contains a one-use password setup link that expires after 24 hours.</p>
+      <form action={createStaffUserAction} className="mt-5 grid gap-4 border bg-white p-5 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_190px_auto]">
+        <div className="space-y-2"><Label htmlFor="invite-name">Name</Label><Input id="invite-name" name="name" required /></div>
+        <div className="space-y-2"><Label htmlFor="invite-email">Email</Label><Input id="invite-email" name="email" type="email" required /></div>
+        <div className="space-y-2"><Label htmlFor="invite-role">Role</Label><select id="invite-role" name="role" className="h-9 w-full border bg-white px-3 text-sm">{roles.map((role) => <option key={role}>{role}</option>)}</select></div>
+        <div className="flex items-end"><SubmitButton pendingLabel="Inviting…">Send invitation</SubmitButton></div>
+      </form>
+    </section>
+  </div>;
 }

@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { ArrowRight, FileText } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireRole } from "@/lib/auth/session";
+import { activateOrganizationContext, requireRole } from "@/lib/auth/session";
 import { StatusBadge } from "@/components/status-badge";
 import { formatDate } from "@/lib/format";
 
 export default async function ReviewQueuePage() {
-  const user = await requireRole(["REVIEWER", "CASEWORKER"]);
+  const user = activateOrganizationContext(await requireRole(["REVIEWER", "CASEWORKER"]));
   const [packets, applications] = await Promise.all([
     db.applicationPacket.findMany({ where: user.role === "CASEWORKER" ? { clientCase: { assignedCaseworkerId: user.id } } : { status: { not: "DRAFT" } }, include: { clientCase: true, housingProgram: true, fields: true }, orderBy: { generatedAt: "desc" } }),
     db.applicationDraft.findMany({ where: user.role === "CASEWORKER" ? { clientCase: { assignedCaseworkerId: user.id }, generatedAt: { not: null } } : { status: { in: ["SUBMITTED_FOR_REVIEW", "APPROVED", "RETURNED"] } }, include: { clientCase: true, template: { include: { housingProgram: true } }, fields: { include: { templateField: true } } }, orderBy: { updatedAt: "desc" } }),

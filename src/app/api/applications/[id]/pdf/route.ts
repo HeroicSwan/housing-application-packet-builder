@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { canAccessCase, getCurrentUser } from "@/lib/auth/session";
+import { activateOrganizationContext, canAccessCase, requireUser } from "@/lib/auth/session";
 import { safeApplicationFilename } from "@/lib/applications/filename";
 import { generateApplicationOutput } from "@/lib/applications/output";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser(); if (!user) return new NextResponse("Unauthorized", { status: 401 });
+  const user = activateOrganizationContext(await requireUser());
   const { id } = await params;
   try {
     const { draft, pdfData, bytes } = await generateApplicationOutput(id);

@@ -1,0 +1,22 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { KeyRound, ShieldCheck } from "lucide-react";
+import { bootstrapSetupAction } from "@/app/actions/setup";
+import { SubmitButton } from "@/components/submit-button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { activateOrganizationContext, getCurrentUser } from "@/lib/auth/session";
+import { installationClaimStatus } from "@/lib/setup/bootstrap";
+
+export default async function SetupBootstrapPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const user = activateOrganizationContext(await getCurrentUser());
+  if (user) redirect("/admin/setup");
+  const status = await installationClaimStatus();
+  const { error } = await searchParams;
+  if (!status.available) return <main className="mx-auto flex min-h-[calc(100vh-40px)] max-w-3xl items-center px-5 py-14"><section className="w-full rounded-2xl border bg-white p-7 shadow-[0_20px_60px_rgba(21,38,59,0.08)] sm:p-10"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#e8f0fb] text-primary"><ShieldCheck /></div><h1 className="mt-6 text-3xl font-semibold tracking-[-0.03em]">Installation setup is unavailable</h1><p className="mt-3 max-w-2xl leading-7 text-muted-foreground">{status.claimed ? "This installation already has an organization or administrator. Sign in with an authorized administrator account to resume or explicitly reopen setup." : "The operator must configure the SHA-256 digest of a one-time setup token on the server before the first administrator can claim this installation."}</p><Link href="/" className="mt-7 inline-flex h-11 items-center rounded-md bg-primary px-5 text-sm font-medium text-white">Return to sign in</Link></section></main>;
+  return <main className="min-h-[calc(100vh-40px)] bg-[#f4f6f8] px-5 py-12"><div className="mx-auto grid max-w-5xl overflow-hidden rounded-2xl border bg-white shadow-[0_24px_80px_rgba(21,38,59,0.09)] lg:grid-cols-[0.8fr_1.2fr]"><aside className="bg-[#102a43] p-8 text-white sm:p-10"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10"><KeyRound /></div><p className="mt-9 text-xs font-semibold uppercase tracking-[0.12em] text-white/60">One-time installation claim</p><h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">Create the first administrator securely.</h1><p className="mt-5 leading-7 text-white/70">The server stores only a hash of the one-time token. The token is rate-limited, used once, and never written to audit logs.</p><div className="mt-10 border-t border-white/15 pt-6 text-sm leading-6 text-white/65">Use synthetic data until every technical and organizational production gate is approved.</div></aside><section className="p-7 sm:p-10"><h2 className="text-2xl font-semibold tracking-[-0.02em]">Claim this installation</h2><p className="mt-2 text-sm text-muted-foreground">All fields are required. Passwords and the one-time token are never returned to the browser.</p>{error && <div role="alert" className="mt-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}<form action={bootstrapSetupAction} className="mt-7 grid gap-5 sm:grid-cols-2"><Field id="organizationName" label="Organization name" placeholder="Harbor Community Services" /><Field id="administratorName" label="Administrator name" autoComplete="name" /><Field id="administratorEmail" label="Administrator email" type="email" autoComplete="email" /><Field id="token" label="One-time setup token" type="password" autoComplete="off" /><Field id="password" label="New password" type="password" autoComplete="new-password" minLength={12} /><Field id="confirmPassword" label="Confirm password" type="password" autoComplete="new-password" minLength={12} /><div className="sm:col-span-2"><p className="mb-4 text-xs leading-5 text-muted-foreground">Use at least 12 characters with lowercase, uppercase, and a number. MFA enrollment is configured in the guided setup.</p><SubmitButton className="h-11 w-full sm:w-auto" pendingLabel="Claiming installation…">Create administrator and continue</SubmitButton></div></form></section></div></main>;
+}
+
+function Field({ id, label, ...props }: { id: string; label: string } & React.ComponentProps<typeof Input>) {
+  return <div className="space-y-2"><Label htmlFor={id}>{label}</Label><Input id={id} name={id} required {...props} /></div>;
+}

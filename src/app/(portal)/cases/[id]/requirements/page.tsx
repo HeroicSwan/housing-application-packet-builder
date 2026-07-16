@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import { db } from "@/lib/db";
-import { canAccessCase, requireRole } from "@/lib/auth/session";
+import { activateOrganizationContext, canAccessCase, requireRole } from "@/lib/auth/session";
 import { evaluateRequirements } from "@/lib/requirements/engine";
 import { detectInconsistencies } from "@/lib/requirements/inconsistencies";
 import { CaseHeader } from "@/features/cases/case-header";
@@ -11,7 +11,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 
 export default async function RequirementsPage({ params }: { params: Promise<{ id: string }> }) {
-  const user = await requireRole(["CASEWORKER", "REVIEWER"]); const { id } = await params; if (!(await canAccessCase(user, id))) notFound(); const clientCase = await db.clientCase.findUnique({ where: { id }, include: { selectedProgram: { include: { requirements: { orderBy: { sortOrder: "asc" } } } }, householdMembers: true, documents: { include: { extractedFields: true } } } }); if (!clientCase) notFound();
+  const user = activateOrganizationContext(await requireRole(["CASEWORKER", "REVIEWER"])); const { id } = await params; if (!(await canAccessCase(user, id))) notFound(); const clientCase = await db.clientCase.findUnique({ where: { id }, include: { selectedProgram: { include: { requirements: { orderBy: { sortOrder: "asc" } } } }, householdMembers: true, documents: { include: { extractedFields: true } } } }); if (!clientCase) notFound();
   if (!clientCase.selectedProgram) return <div><CaseHeader clientCase={clientCase} /><div className="mt-10 border bg-white p-10 text-center"><h2 className="text-2xl font-semibold">Select a program first</h2><p className="mt-2 text-muted-foreground">A program is needed before requirements can be evaluated.</p><Button asChild className="mt-6"><Link href={`/cases/${id}/program`}>Choose a program <ArrowRight /></Link></Button></div></div>;
   const values = clientCase.documents.flatMap((document) => document.extractedFields.map((field) => ({ fieldName: field.fieldName, value: field.reviewedValue ?? field.extractedValue, category: document.documentCategory })));
   const caseFacts = { legalName: clientCase.legalName, dateOfBirth: clientCase.dateOfBirth, householdCount: clientCase.householdMembers.length + 1, householdHasChildren: clientCase.householdMembers.some((member) => member.relationship.toLowerCase() === "child"), accessibilityNeeds: clientCase.accessibilityNeeds, documents: clientCase.documents.map((document) => ({ category: document.documentCategory, expirationDate: document.expirationDate })), requiredFields: { current_living_situation: clientCase.currentLivingSituation } };

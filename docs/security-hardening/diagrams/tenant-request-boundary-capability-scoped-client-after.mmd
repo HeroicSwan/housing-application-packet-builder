@@ -1,0 +1,8 @@
+flowchart LR
+  U["Authenticated user"] --> H["Awaited auth helper"]
+  H -->|"validated organization"] B["Organization-bound DB capability"]
+  B --> A["Page / action / API route"]
+  A --> S["Capability-aware service"]
+  S --> T["Tenant Prisma boundary"]
+  T --> R["PostgreSQL RLS"]
+  Y["System client"] -->|"narrow grants only"] R

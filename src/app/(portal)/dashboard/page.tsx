@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, CircleAlert, Clock3, FileText } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/auth/session";
+import { activateOrganizationContext, requireUser } from "@/lib/auth/session";
 import { statusLabel, formatDate } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
 import { SectionHeading } from "@/components/section-heading";
@@ -17,8 +17,8 @@ function PageIntro({ eyebrow, title, description, action }: { eyebrow: string; t
 }
 
 export default async function DashboardPage() {
-  const user = await requireUser();
-  if (user.role === "REVIEWER") {
+  const user = activateOrganizationContext(await requireUser());
+  if (["REVIEWER", "SUPERVISOR"].includes(user.role)) {
     const [awaiting, conflicts, approved, packets] = await Promise.all([
       db.applicationPacket.count({ where: { status: "READY_FOR_REVIEW" } }), db.applicationPacket.count({ where: { unresolvedConflicts: { gt: 0 } } }), db.applicationPacket.count({ where: { status: "APPROVED" } }),
       db.applicationPacket.findMany({ where: { status: { in: ["READY_FOR_REVIEW", "NEEDS_CORRECTION"] } }, include: { clientCase: true, housingProgram: true }, orderBy: { generatedAt: "desc" }, take: 5 }),
@@ -28,6 +28,13 @@ export default async function DashboardPage() {
   if (user.role === "ADMIN") {
     const [programs, requirements, activity] = await Promise.all([db.housingProgram.count({ where: { isActive: true } }), db.programRequirement.count(), db.auditEvent.findMany({ include: { user: true }, orderBy: { createdAt: "desc" }, take: 6 })]);
     return <div><PageIntro eyebrow="Administrator workspace" title="Program operations" description="Maintain fictional demonstration programs, requirements, and local accounts." /><div className="mt-9 grid border-y sm:grid-cols-3 sm:divide-x"><div className="px-4"><WorkItem value={programs} label="Active programs" icon={FileText} /></div><div className="px-4"><WorkItem value={requirements} label="Program requirements" icon={CheckCircle2} /></div><div className="px-4"><WorkItem value={activity.length} label="Recent events shown" icon={Clock3} /></div></div><section className="mt-10"><SectionHeading title="Recent system activity" /><div className="mt-2 divide-y">{activity.map((event) => <div key={event.id} className="grid gap-2 px-3 py-4 sm:grid-cols-[1fr_auto]"><div><span className="font-medium">{statusLabel(event.action)}</span><span className="text-muted-foreground"> · {event.user.name}</span></div><time className="text-sm text-muted-foreground">{formatDate(event.createdAt)}</time></div>)}</div></section></div>;
+  }
+  if (user.role === "SUPPORT_READ_ONLY") {
+    return <div><PageIntro eyebrow="Read-only support" title="System access is intentionally limited" description="This role can confirm that the application is reachable and manage only its own account security. Applicant cases, documents, exports, and configuration are not available." /><div className="mt-9 border-y px-4"><WorkItem value={1} label="Active support session" icon={CheckCircle2} tone="success" /></div></div>;
+  }
+  if (user.role === "AUDITOR") {
+    const [cases, events] = await Promise.all([db.clientCase.count(), db.auditEvent.count()]);
+    return <div><PageIntro eyebrow="Auditor workspace" title="Read-only oversight" description="Review case and audit evidence without permission to change workflow data." action={<Button asChild variant="outline"><Link href="/cases">Open read-only cases</Link></Button>} /><div className="mt-9 grid border-y sm:grid-cols-2 sm:divide-x"><div className="px-4"><WorkItem value={cases} label="Cases in scope" icon={FileText} /></div><div className="px-4"><WorkItem value={events} label="Audit events" icon={Clock3} /></div></div></div>;
   }
   const [open, missing, awaiting, returned, cases] = await Promise.all([
     db.clientCase.count({ where: { assignedCaseworkerId: user.id, status: { notIn: ["APPROVED", "ARCHIVED"] } } }),

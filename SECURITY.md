@@ -1,39 +1,40 @@
-# Security
+# Security policy
 
-## Threat model
+## Supported release status
 
-Relevant threats include unauthorized access to sensitive housing records, cross-role access, forged sessions, credential attacks, malicious or oversized uploads, path traversal, secrets reaching the browser, sensitive values entering logs, improper reviewer overrides, data retained past policy, and compromised infrastructure or backups.
+| Release | Status |
+| --- | --- |
+| Unreleased source | Best-effort maintenance; no compatibility guarantee |
+| Organization-approved deployment | Self-supported; external gates still apply |
 
-## Current controls
+No repository release is itself approval for real applicant information or evidence of regulatory compliance. A deploying organization owns the approvals and controls listed in `docs/version-1-criteria.md`.
 
-- Opaque, revocable, expiring database sessions in secure HTTP-only same-site cookies, with record-level and role checks inside server actions and protected routes.
-- Passwords hashed with bcrypt; account lockout, durable login throttling, generic password-reset responses, expiring one-use reset tokens, and global session revocation after password changes.
-- Durable database-backed rate limiting that works across application restarts.
-- Upload allowlist for PDF, PNG, and JPEG; extension/MIME consistency, configurable size cap, normalized filenames, random prefixes, and resolved-path containment.
-- PDF, PNG, and JPEG magic-byte checks, processor-output schema validation, safe failed-processing records, and retry limited to failed local uploads.
-- Production configuration requires malware scanning; the bundled profile streams every upload through ClamAV before encrypted storage.
-- Uploaded bytes and AcroForm templates are authenticated-encrypted before local or S3 storage. Extracted sensitive values are not written to audit metadata or application logs.
-- Anthropic credentials remain server-side and the provider is disabled by default.
-- Requirement states and approval gates are deterministic; conflicts cannot be overridden by a note.
-- Export routes require a session and send private, no-store cache directives.
-- Important mutations create readable audit events.
-- `.env`, local databases, and uploaded files are ignored by Git.
-- Caseworkers receive record-level access only to assigned cases and their packets. Reviewer access is read/review scoped; administrator mutations re-check the administrator role.
-- Next.js Server Action origin checks provide same-origin CSRF protection; the configured action body limit is slightly above the application upload limit for multipart overhead.
-- Production configuration has no fallback session secret, and one-click demo role login is controlled by `ENABLE_DEMO_LOGIN`.
+## Reporting a vulnerability
+
+Use the repository host's private vulnerability-reporting feature when it is available. If it is not available, contact the repository owner through a private channel exposed by the repository host. Do not open a public issue containing exploit details, secrets, document contents, or applicant information.
+
+Include the affected revision, component, synthetic reproduction steps, impact, and any safe mitigation. Redact tokens and sensitive values; report only the provider or variable category.
+
+## Secrets and exposed keys
+
+Never commit API keys, passwords, encryption keys, session secrets, access tokens, or filled environment files. `.env.example` contains placeholders only.
+
+Any provider key previously pasted into a chat, issue, log, screenshot, or repository copy must be treated as compromised. Revoke or rotate it through that provider's authorized interface, remove it from local configuration, and review provider usage records. Deleting a value from the current tree is not key rotation and does not remove it from prior copies. Do not rewrite shared Git history as part of ordinary Phase 0 remediation.
+
+## Applicant data
+
+Never use real applicant information in local development, tests, issues, screenshots, or support artifacts. A production deployment must use the enforced production profile and complete the external launch gates. Report accidental exposure privately and follow the affected organization's incident process.
+
+## Observed controls
+
+The repository includes server-side role and record checks, revocable database sessions, password hashing, optional TOTP, throttling, upload type and size validation, encrypted object storage adapters, private export responses, human review of extraction proposals, and application audit events. These are implementation details, not a warranty that the application is secure for production.
 
 ## Known limitations
 
-The bundled local identity system provides TOTP MFA but not SSO, automated identity-provider provisioning, or organization tenancy. Organizations requiring those controls should replace local login with their reviewed identity provider. Audit records are not append-only. Demo credentials and one-click login must be disabled before any real deployment.
+- Local mode is intentionally synthetic/SQLite and is not a production architecture.
+- Optional AI and delivery providers require separate privacy, security, contractual, destination, and operational approval.
+- Real agency templates and destinations still require owner acceptance.
+- No external penetration test, security audit, privacy certification, or compliance certification has been completed.
+- Manual accessibility and caseworker studies, an incident tabletop, and a timed managed-PostgreSQL restore remain external launch gates.
 
-## Production hardening
-
-Use a reviewed identity provider with MFA and lifecycle controls; managed secrets; TLS; PostgreSQL with least-privilege credentials; private object storage with signed URLs; malware and content scanning; centralized rate limiting; CSRF review; granular case assignment policy; security headers; dependency and container scanning; encrypted backups; immutable audit export; monitoring and alerting; incident response; penetration testing; privacy impact assessment; vendor review for any AI processor; and jurisdiction-appropriate consent and access procedures.
-
-## Retention and encryption
-
-Define retention by record and document category, legal obligations, program agreements, and client consent. Automate deletion and record defensible deletion events. Encrypt database, objects, backups, and transport. Where feasible, use per-tenant keys and rotation. Avoid placing client facts in analytics, traces, error reports, support tools, URLs, or filenames.
-
-Synthetic data is used because the repository, screenshots, tests, logs, and portfolio deployments are not approved systems of record.
-
-Report security concerns privately to the repository owner. Never include real client data in an issue.
+See [docs/version-1-criteria.md](./docs/version-1-criteria.md) for the outstanding gates.

@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
 import { StatusBadge } from "@/components/status-badge";
 import { CaseHeader } from "@/features/cases/case-header";
-import { canAccessCase, requireRole } from "@/lib/auth/session";
+import { activateOrganizationContext, canAccessCase, requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 
 export default async function CaseApplicationPage({ params }: { params: Promise<{ id: string }> }) {
-  const user = await requireRole(["CASEWORKER"]); const { id } = await params;
+  const user = activateOrganizationContext(await requireRole(["CASEWORKER"])); const { id } = await params;
   if (!(await canAccessCase(user, id))) notFound();
   const clientCase = await db.clientCase.findUnique({ where: { id }, include: { selectedProgram: { include: { requirements: true, applicationTemplates: { where: { status: "ACTIVE" }, include: { fields: true, drafts: { where: { clientCaseId: id }, include: { fields: true } } }, orderBy: { version: "desc" } } } } } });
   if (!clientCase) notFound();

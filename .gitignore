@@ -32,11 +32,14 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
-!.env.example
+!.env*.example
 
 # local demonstration data
 prisma/*.db
 prisma/*.db-journal
+prisma/*.db-shm
+prisma/*.db-wal
+/prisma/.e2e/
 uploads/
 
 # runtime-generated artifacts (not source)
@@ -45,6 +48,12 @@ uploads/
 /tmp/
 /test-results/
 /playwright-report/
+/.next-*/
+/graphify-out/
+sbom*.json
+*.sqlite.enc
+*.backup
+*.log
 
 # vercel
 .vercel

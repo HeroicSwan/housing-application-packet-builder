@@ -1,0 +1,33 @@
+groups:
+  - name: housing-packet-builder
+    rules:
+      - alert: HousingPacketBuilderUnavailable
+        expr: probe_success{job="housing-packet-builder"} == 0
+        for: 5m
+        labels: { severity: critical }
+        annotations: { summary: "Housing Packet Builder health endpoint is unavailable" }
+      - alert: HousingPacketBuilderStaleJobs
+        expr: hapb_jobs_stale > 0
+        for: 10m
+        labels: { severity: critical }
+        annotations: { summary: "Durable jobs have stale worker locks" }
+      - alert: HousingPacketBuilderTerminalJobFailures
+        expr: hapb_jobs_failed > 0
+        for: 15m
+        labels: { severity: warning }
+        annotations: { summary: "Durable jobs reached terminal failure" }
+      - alert: HousingPacketBuilderSubmissionFailures
+        expr: hapb_submissions_failed > 0
+        for: 15m
+        labels: { severity: warning }
+        annotations: { summary: "Application deliveries require operator review" }
+      - alert: HousingPacketBuilderDocumentFailures
+        expr: hapb_documents_failed > 0
+        for: 15m
+        labels: { severity: warning }
+        annotations: { summary: "Uploaded documents require processing review" }
+      - alert: HousingPacketBuilderBackupStale
+        expr: hapb_last_backup_age_seconds < 0 or hapb_last_backup_age_seconds > 129600
+        for: 30m
+        labels: { severity: critical }
+        annotations: { summary: "No verified database backup exists in the last 36 hours" }

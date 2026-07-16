@@ -1,25 +1,19 @@
-# Production deployment
+# Experimental container profile
 
-The included production profile is a single-instance deployment with a migrated SQLite database on a persistent volume and private S3-compatible object storage. Use a managed container platform, TLS ingress, managed SMTP, and an external uptime monitor.
+The repository retains a Dockerfile and Compose profile as implementation references. They are not part of the supported Phase 0 local workflow, have not been validated as a production platform, and do not authorize real applicant data.
 
-## Configure
+Phase 0 development, database setup, seeding, tests, E2E, and builds use Node/npm and SQLite without Docker. Follow [docs/local-development.md](./docs/local-development.md).
 
-1. Copy `.env.production.example` to `.env.production` outside source control.
-2. Generate independent session and encryption secrets. `DATA_ENCRYPTION_KEY` must be a base64-encoded 32-byte value.
-3. Set the public HTTPS `APP_URL`, Anthropic document-processing key, SMTP credentials, and private S3 credentials.
-4. Keep `ENABLE_DEMO_LOGIN=false` and use a non-demonstration administrator account.
+## Observed profile
 
-## Deploy
+The retained Compose file describes a single application instance, SQLite volume, S3-compatible object storage, ClamAV service, and periodic encrypted backup process. The application container applies committed Prisma migrations before startup.
 
-Run `docker compose --env-file .env.production -f compose.production.yml up --build -d`. Startup applies committed Prisma migrations before serving traffic. `/api/health` checks database availability and is used by the container health check.
+These components demonstrate adapters already present in the repository. Their presence does not establish availability, confidentiality, restoration, scaling, monitoring, retention, incident-response, or compliance guarantees.
 
-The backup service creates an authenticated AES-256-GCM database snapshot every 24 hours and uploads it to the private object store. Test restore material regularly with `npm run backup:verify -- <local-backup-file>` and a disposable environment.
+## Current limitation
 
-## Operational requirements
+There is no supported production deployment in Phase 0. The profile remains synthetic-only and must keep `DATA_MODE=synthetic`. It has not completed external penetration testing, privacy review, real-template acceptance testing, recovery exercises, monitoring validation, or caseworker acceptance testing.
 
-- Put the application behind TLS and restrict the MinIO/API consoles to an operations network.
-- Configure external health checks and alerts for HTTP 503, container restarts, failed `BackupRun` records, and failed `ApplicationSubmission` records.
-- Export container logs to a retention-controlled security log service. Application logs intentionally exclude document contents and extracted values.
-- Rotate SMTP, S3, Anthropic, session, and data-encryption credentials under a documented key-rotation procedure.
-- Run dependency/container scanning, penetration testing, privacy review, and an incident-response exercise before real client data is authorized.
-- The bundled database profile is single-writer. Organizations needing horizontal scaling should migrate the same relational model to managed PostgreSQL before adding application replicas.
+## Future consideration
+
+Before any production or real-data proposal, complete every applicable gate in [docs/version-1-criteria.md](./docs/version-1-criteria.md), define accountable operators, and obtain independent legal, privacy, security, accessibility, and program approval. Those activities are outside Phase 0.

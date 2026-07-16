@@ -1,0 +1,13 @@
+{
+  "templateName": "Synthetic Family Pathways AcroForm",
+  "fields": [
+    { "pdfFieldName": "Applicant.Name", "type": "text", "testValue": "Synthetic Applicant" },
+    { "pdfFieldName": "Applicant.DOB", "type": "text", "testValue": "01/02/1990" },
+    { "pdfFieldName": "Applicant.Phone", "type": "text", "testValue": "555-0100" },
+    { "pdfFieldName": "Applicant.Email", "type": "text", "testValue": "synthetic@example.test" },
+    { "pdfFieldName": "Household.Size", "type": "text", "testValue": "4" },
+    { "pdfFieldName": "Income.Monthly", "type": "text", "testValue": "2450.00" },
+    { "pdfFieldName": "Signature.Typed", "type": "text", "testValue": "Synthetic Applicant" },
+    { "pdfFieldName": "Consent.Yes", "type": "checkbox", "testValue": true }
+  ]
+}

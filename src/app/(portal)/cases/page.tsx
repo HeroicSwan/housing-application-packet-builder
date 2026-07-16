@@ -1,15 +1,15 @@
 import Link from "next/link";
 import { ArrowRight, Plus } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireRole } from "@/lib/auth/session";
+import { activateOrganizationContext, requireRole } from "@/lib/auth/session";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatDate } from "@/lib/format";
 
 export default async function CasesPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string }> }) {
-  const user = await requireRole(["CASEWORKER"]);
+  const user = activateOrganizationContext(await requireRole(["CASEWORKER", "AUDITOR"]));
   const { q = "", status = "" } = await searchParams;
-  const cases = await db.clientCase.findMany({ where: { assignedCaseworkerId: user.id, ...(status ? { status } : {}), ...(q ? { OR: [{ legalName: { contains: q } }, { preferredName: { contains: q } }, { referenceNumber: { contains: q } }] } : {}) }, include: { selectedProgram: true, documents: true }, orderBy: { updatedAt: "desc" } });
+  const cases = await db.clientCase.findMany({ where: { ...(user.role === "CASEWORKER" ? { assignedCaseworkerId: user.id } : {}), ...(status ? { status } : {}), ...(q ? { OR: [{ legalName: { contains: q } }, { preferredName: { contains: q } }, { referenceNumber: { contains: q } }] } : {}) }, include: { selectedProgram: true, documents: true }, orderBy: { updatedAt: "desc" } });
   return <div><div className="flex flex-wrap items-end justify-between gap-5"><div><p className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">Case management</p><h1 className="mt-2 text-3xl font-semibold tracking-[-0.03em]">Client cases</h1><p className="mt-2 text-sm text-muted-foreground">Only synthetic demonstration records are permitted.</p></div><Button asChild><Link href="/cases/new"><Plus /> Create case</Link></Button></div><form className="mt-8 grid gap-3 border-y py-4 sm:grid-cols-[1fr_220px_auto]"><Input name="q" defaultValue={q} placeholder="Search name or reference" aria-label="Search cases" /><select name="status" defaultValue={status} className="h-10 rounded-md border bg-white px-3 text-sm" aria-label="Filter by status"><option value="">All statuses</option>{["INTAKE", "COLLECTING_DOCUMENTS", "READY_FOR_REVIEW", "NEEDS_CORRECTION", "APPROVED", "ARCHIVED"].map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select><Button variant="outline">Apply filters</Button></form><div className="mt-3">{cases.length ? <div className="divide-y">{cases.map((clientCase) => <Link data-row-link key={clientCase.id} href={`/cases/${clientCase.id}`} className="grid items-center gap-3 rounded-md px-3 py-4 md:grid-cols-[130px_1fr_1fr_150px_110px_auto]"><div className="text-sm font-medium text-primary">{clientCase.referenceNumber}</div><div><div className="font-medium">{clientCase.preferredName ?? clientCase.legalName}</div><div className="mt-0.5 text-xs text-muted-foreground">Updated {formatDate(clientCase.updatedAt)}</div></div><div className="text-sm text-muted-foreground">{clientCase.selectedProgram?.name ?? "Program not selected"}</div><StatusBadge status={clientCase.status} /><div className="text-sm">{clientCase.documents.length} documents</div><ArrowRight className="h-4 w-4 text-muted-foreground" /></Link>)}</div> : <div className="border-y p-12 text-center"><h2 className="text-lg font-semibold">No cases found</h2><p className="mt-2 text-sm text-muted-foreground">Adjust the filters or create a new synthetic case.</p></div>}</div></div>;
 }

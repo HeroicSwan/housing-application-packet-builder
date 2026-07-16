@@ -1,0 +1,43 @@
+name: PostgreSQL production boundary
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  postgres:
+    name: Blocking PostgreSQL migration and RLS test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_DB: hapb_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-postgres-owner-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d hapb_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATA_MODE: synthetic
+      SESSION_SECRET: test-session-secret-with-at-least-32-characters
+      POSTGRES_TEST_ADMIN_URL: postgresql://postgres:test-postgres-owner-password@127.0.0.1:5432/hapb_test
+      POSTGRES_TEST_APP_URL: postgresql://hapb_ci_app:test-postgres-role-password@127.0.0.1:5432/hapb_test
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run db:generate:production
+      - name: Apply PostgreSQL migrations
+        run: npx prisma migrate deploy --schema prisma/production/schema.prisma
+        env:
+          DATABASE_URL: ${{ env.POSTGRES_TEST_ADMIN_URL }}
+      - name: Provision non-superuser application role
+        run: node scripts/provision-postgres-test-role.mjs
+      - name: Verify schema and row-level isolation
+        run: npx vitest run tests/production-postgres.test.ts tests/postgres-rls.integration.test.ts

@@ -1,0 +1,16 @@
+import Link from "next/link";
+import { Check, Circle, ShieldCheck } from "lucide-react";
+import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
+import { cn } from "@/lib/utils";
+import { setupSteps, type SetupStepId } from "@/lib/setup/steps";
+
+export function SetupShell({ current, completed, children }: { current: SetupStepId; completed: Set<string>; children: React.ReactNode }) {
+  const index = setupSteps.findIndex((step) => step.id === current);
+  return <div><header className="mb-8"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.1em] text-primary"><ShieldCheck className="h-4 w-4" /> Administrator setup</div><div className="mt-3 flex flex-wrap items-end justify-between gap-4"><div><h1 className="text-3xl font-semibold tracking-[-0.03em]">Configure your organization safely</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Save progress at any time. Stored secrets are encrypted and never shown again; production sign-off remains blocked until required checks pass.</p></div><span className="rounded-full border bg-white px-3 py-1.5 text-xs font-medium">Step {index + 1} of {setupSteps.length}</span></div><Progress className="mt-5" value={((index + 1) / setupSteps.length) * 100}><ProgressLabel className="sr-only">Setup progress</ProgressLabel><ProgressValue /></Progress></header><div className="grid items-start gap-7 lg:grid-cols-[260px_minmax(0,1fr)]"><nav aria-label="Setup progress" className="rounded-xl border bg-white p-2 shadow-[0_8px_30px_rgba(21,38,59,0.04)]"><ol>{setupSteps.map((step, stepIndex) => { const active = step.id === current; const done = completed.has(step.id); return <li key={step.id}><Link href={`/admin/setup?step=${step.id}`} aria-current={active ? "step" : undefined} className={cn("flex min-h-14 items-start gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-muted", active && "bg-accent text-accent-foreground")}><span className={cn("mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold", done && "border-emerald-600 bg-emerald-600 text-white", active && !done && "border-primary bg-primary text-white")}>{done ? <Check className="h-3.5 w-3.5" /> : active ? stepIndex + 1 : <Circle className="h-2.5 w-2.5" />}</span><span><span className="block text-sm font-medium">{step.label}</span><span className="mt-0.5 block text-xs leading-4 text-muted-foreground">{step.summary}</span></span></Link></li>; })}</ol></nav><section className="min-w-0">{children}</section></div></div>;
+}
+
+export function SetupExplanation({ why, leaves, failure, effect }: { why: string; leaves: string; failure: string; effect: string }) {
+  return <dl className="mt-6 grid gap-3 rounded-xl border bg-[#f7f9fb] p-4 text-sm sm:grid-cols-2"><Info title="Why this matters" value={why} /><Info title="Data sent outside this application" value={leaves} /><Info title="If the service is unavailable" value={failure} /><Info title="Effect on existing cases" value={effect} /></dl>;
+}
+
+function Info({ title, value }: { title: string; value: string }) { return <div><dt className="font-medium text-foreground">{title}</dt><dd className="mt-1 leading-5 text-muted-foreground">{value}</dd></div>; }

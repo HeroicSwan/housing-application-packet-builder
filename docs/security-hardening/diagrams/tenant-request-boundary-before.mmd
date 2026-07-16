@@ -1,0 +1,9 @@
+flowchart LR
+  U["Authenticated user"] --> H["Awaited auth helper"]
+  H -->|"validated organization"] A["Page / action / API route"]
+  H -.->|"context entered inside callee; not preserved"] C["Ambient organization context"]
+  A --> S["Application service"]
+  S --> T["Tenant Prisma boundary"]
+  C --> T
+  T -->|"missing context: fail closed"] X["Workspace error"]
+  T --> R["PostgreSQL RLS"]

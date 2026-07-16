@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "deterministic": {
+    "fieldExactAccuracy": { "minimum": 1 },
+    "normalizedAccuracy": { "minimum": 1 },
+    "missingValueRate": { "maximum": 0 },
+    "hallucinationRate": { "maximum": 0 },
+    "sourceGroundingRate": { "minimum": 1 },
+    "confidenceBrierScore": { "maximum": 0 },
+    "providerFailureRate": { "maximum": 0 },
+    "timeoutRate": { "maximum": 0 },
+    "invalidOutputRate": { "maximum": 0 },
+    "p95LatencyMs": { "maximum": 50 }
+  },
+  "liveProvider": {
+    "fieldExactAccuracy": { "minimum": 0.8 },
+    "normalizedAccuracy": { "minimum": 0.85 },
+    "hallucinationRate": { "maximum": 0.02 },
+    "sourceGroundingRate": { "minimum": 0.95 },
+    "providerFailureRate": { "maximum": 0.05 },
+    "timeoutRate": { "maximum": 0.02 },
+    "invalidOutputRate": { "maximum": 0.02 }
+  }
+}
