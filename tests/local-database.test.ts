@@ -43,7 +43,7 @@ describe("local database selection", () => {
       env: { ...process.env, DATA_MODE: "real", DATABASE_URL: `file:./${filename}` },
     });
     expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain("Real applicant-data mode is not implemented or approved.");
+    expect(result.stderr).toContain("Local SQLite tooling only runs in the synthetic profile.");
     expect(fs.existsSync(databasePath)).toBe(false);
   });
 
@@ -76,7 +76,7 @@ describe("local database selection", () => {
         env: { ...process.env, DATA_MODE: "production", DATABASE_URL: `file:./${filename}` },
       });
       expect(result.status).not.toBe(0);
-      expect(result.stderr).toContain("Real applicant-data mode is not implemented or approved");
+      expect(result.stderr).toContain("Local SQLite tooling only runs in the synthetic profile");
       expect(fs.readFileSync(databasePath, "utf8")).toBe("preserve-me");
     } finally {
       fs.rmSync(databasePath, { force: true });

@@ -151,6 +151,48 @@ describe("fail-closed production configuration", () => {
     })).toThrow("provider approval record");
   });
 
+  it("requires credentials for the expanded provider catalog", () => {
+    expect(() => parseEnvironment({ ...baseEnvironment, DOCUMENT_PROCESSOR: "openai" })).toThrow("OPENAI_API_KEY is required");
+    expect(() => parseEnvironment({ ...baseEnvironment, DOCUMENT_PROCESSOR: "xai" })).toThrow("XAI_API_KEY is required");
+    expect(() => parseEnvironment({ ...baseEnvironment, DOCUMENT_PROCESSOR: "perplexity" })).toThrow("PERPLEXITY_API_KEY is required");
+  });
+
+  it("requires the Azure endpoint and deployment when Azure OpenAI is selected", () => {
+    expect(() => parseEnvironment({
+      ...baseEnvironment,
+      DOCUMENT_PROCESSOR: "azure-openai",
+      AZURE_OPENAI_API_KEY: Buffer.from("Az9Kq7Wv4Nc8Rz2Pd6Ty1Ha5Lf3Xs0Ju").toString("utf8"),
+    })).toThrow("AZURE_OPENAI_ENDPOINT is required");
+  });
+
+  it("requires a base URL and model for the custom OpenAI-compatible provider", () => {
+    expect(() => parseEnvironment({ ...baseEnvironment, DOCUMENT_PROCESSOR: "custom" })).toThrow("CUSTOM_OPENAI_BASE_URL is required");
+    expect(() => parseEnvironment({
+      ...baseEnvironment,
+      DOCUMENT_PROCESSOR: "custom",
+      CUSTOM_OPENAI_BASE_URL: "https://gateway.internal.example/v1",
+    })).toThrow("CUSTOM_OPENAI_MODEL is required");
+  });
+
+  it("requires HTTPS for production Ollama and custom endpoints", () => {
+    expect(() => parseEnvironment({
+      ...productionEnvironment,
+      DOCUMENT_PROCESSOR: "ollama",
+      APPROVED_AI_PROVIDERS: "ollama",
+      AI_PROVIDER_APPROVAL_ID: "vendor-review-2026-07",
+      OLLAMA_BASE_URL: "http://ollama.internal:11434",
+    })).toThrow("OLLAMA_BASE_URL must use HTTPS");
+
+    expect(() => parseEnvironment({
+      ...productionEnvironment,
+      DOCUMENT_PROCESSOR: "custom",
+      APPROVED_AI_PROVIDERS: "custom",
+      AI_PROVIDER_APPROVAL_ID: "vendor-review-2026-07",
+      CUSTOM_OPENAI_BASE_URL: "http://gateway.internal.example/v1",
+      CUSTOM_OPENAI_MODEL: "internal-model",
+    })).toThrow("CUSTOM_OPENAI_BASE_URL must use HTTPS");
+  });
+
   it("accepts a selected AI provider only when all approval controls are present", () => {
     const parsed = parseEnvironment({
       ...productionEnvironment,

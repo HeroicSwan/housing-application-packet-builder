@@ -54,24 +54,49 @@ const envSchema = z.object({
   DATA_MODE: z.enum(["synthetic", "production"]).default("synthetic"),
   PRODUCTION_DATA_ACKNOWLEDGEMENT: z.string().optional(),
   SESSION_SECRET: z.string().min(32),
-  DOCUMENT_PROCESSOR: z.enum(["disabled", "mock", "anthropic", "gemini", "groq", "openrouter", "sambanova", "cerebras", "mistral"]).default("mock"),
+  DOCUMENT_PROCESSOR: z.enum(["disabled", "mock", "anthropic", "gemini", "groq", "openrouter", "sambanova", "cerebras", "mistral", "openai", "azure-openai", "xai", "deepseek", "together", "fireworks", "cohere", "perplexity", "ollama", "custom"]).default("mock"),
   APPROVED_AI_PROVIDERS: z.string().default("").transform((value) => value.split(",").map((item) => item.trim()).filter(Boolean)),
-  ANTHROPIC_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(20).optional()),
+  ANTHROPIC_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
   ANTHROPIC_MODEL: z.string().default("claude-sonnet-4-5"),
-  GEMINI_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(20).optional()),
+  GEMINI_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
   GEMINI_MODEL: z.string().default("gemini-2.0-flash"),
-  GROQ_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(20).optional()),
+  GROQ_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
   GROQ_MODEL: z.string().default("llama-3.3-70b-versatile"),
-  OPENROUTER_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(20).optional()),
+  OPENROUTER_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
   OPENROUTER_MODEL: z.string().default("openai/gpt-4o-mini"),
   OPENROUTER_HTTP_REFERER: z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional()),
   OPENROUTER_APP_TITLE: z.string().max(120).default("Housing Application Packet Builder"),
-  SAMBANOVA_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(20).optional()),
+  SAMBANOVA_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
   SAMBANOVA_MODEL: z.string().default("Meta-Llama-3.3-70B-Instruct"),
-  CEREBRAS_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(20).optional()),
+  CEREBRAS_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
   CEREBRAS_MODEL: z.string().default("gpt-oss-120b"),
-  MISTRAL_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(20).optional()),
+  MISTRAL_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
   MISTRAL_MODEL: z.string().default("mistral-small-latest"),
+  OPENAI_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
+  OPENAI_MODEL: z.string().default("gpt-4o-mini"),
+  AZURE_OPENAI_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
+  AZURE_OPENAI_ENDPOINT: z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional()),
+  AZURE_OPENAI_DEPLOYMENT: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).max(120).optional()),
+  AZURE_OPENAI_API_VERSION: z.string().default("2024-10-21"),
+  XAI_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
+  XAI_MODEL: z.string().default("grok-4-fast-non-reasoning"),
+  DEEPSEEK_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
+  DEEPSEEK_MODEL: z.string().default("deepseek-chat"),
+  TOGETHER_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
+  TOGETHER_MODEL: z.string().default("meta-llama/Llama-3.3-70B-Instruct-Turbo"),
+  FIREWORKS_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
+  FIREWORKS_MODEL: z.string().default("accounts/fireworks/models/llama-v3p3-70b-instruct"),
+  COHERE_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
+  COHERE_MODEL: z.string().default("command-a-03-2025"),
+  PERPLEXITY_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
+  PERPLEXITY_MODEL: z.string().default("sonar"),
+  OLLAMA_BASE_URL: z.preprocess((value) => value === "" ? undefined : value, z.string().url().default("http://127.0.0.1:11434")),
+  OLLAMA_MODEL: z.string().default("llama3.2-vision"),
+  OLLAMA_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(8).optional()),
+  CUSTOM_OPENAI_BASE_URL: z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional()),
+  CUSTOM_OPENAI_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(8).optional()),
+  CUSTOM_OPENAI_MODEL: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).max(200).optional()),
+  CUSTOM_OPENAI_PROVIDER_NAME: z.string().min(1).max(120).default("Custom OpenAI-compatible provider"),
   DOCUMENT_PROCESSOR_TIMEOUT_MS: z.coerce.number().int().min(5000).max(120000).default(60000),
   MAX_UPLOAD_MB: z.coerce.number().positive().max(25).default(8),
   ENABLE_DEMO_LOGIN: z.enum(["true", "false"]).transform((value) => value === "true"),
@@ -120,10 +145,21 @@ const envSchema = z.object({
 }).superRefine((value, context) => {
   if (value.DATA_MODE === "production" && value.PRODUCTION_DATA_ACKNOWLEDGEMENT !== productionAcknowledgement) context.addIssue({ code: "custom", path: ["PRODUCTION_DATA_ACKNOWLEDGEMENT"], message: "Production data mode requires the documented operator acknowledgement." });
   if (value.ENFORCE_PRODUCTION_CONFIG && value.DATA_MODE !== "production") context.addIssue({ code: "custom", path: ["DATA_MODE"], message: "Production enforcement requires DATA_MODE=production." });
-  const providerKeys = { anthropic: "ANTHROPIC_API_KEY", gemini: "GEMINI_API_KEY", groq: "GROQ_API_KEY", openrouter: "OPENROUTER_API_KEY", sambanova: "SAMBANOVA_API_KEY", cerebras: "CEREBRAS_API_KEY", mistral: "MISTRAL_API_KEY" } as const;
+  const providerKeys = { anthropic: "ANTHROPIC_API_KEY", gemini: "GEMINI_API_KEY", groq: "GROQ_API_KEY", openrouter: "OPENROUTER_API_KEY", sambanova: "SAMBANOVA_API_KEY", cerebras: "CEREBRAS_API_KEY", mistral: "MISTRAL_API_KEY", openai: "OPENAI_API_KEY", "azure-openai": "AZURE_OPENAI_API_KEY", xai: "XAI_API_KEY", deepseek: "DEEPSEEK_API_KEY", together: "TOGETHER_API_KEY", fireworks: "FIREWORKS_API_KEY", cohere: "COHERE_API_KEY", perplexity: "PERPLEXITY_API_KEY" } as const;
   const providerKey = providerKeys[value.DOCUMENT_PROCESSOR as keyof typeof providerKeys];
   if (providerKey && !value[providerKey]) context.addIssue({ code: "custom", path: [providerKey], message: `${providerKey} is required when DOCUMENT_PROCESSOR=${value.DOCUMENT_PROCESSOR}.` });
+  // Key material is only validated for the selected provider so stray machine-wide variables for
+  // unselected providers can never block startup.
+  if (providerKey && value[providerKey] && value[providerKey].length < 20) context.addIssue({ code: "custom", path: [providerKey], message: `${providerKey} must be at least 20 characters for the selected provider.` });
   if (providerKey && placeholderCredential(value[providerKey])) context.addIssue({ code: "custom", path: [providerKey], message: `${providerKey} contains a placeholder and cannot be used.` });
+  if (value.DOCUMENT_PROCESSOR === "azure-openai") {
+    if (!value.AZURE_OPENAI_ENDPOINT) context.addIssue({ code: "custom", path: ["AZURE_OPENAI_ENDPOINT"], message: "AZURE_OPENAI_ENDPOINT is required when DOCUMENT_PROCESSOR=azure-openai." });
+    if (!value.AZURE_OPENAI_DEPLOYMENT) context.addIssue({ code: "custom", path: ["AZURE_OPENAI_DEPLOYMENT"], message: "AZURE_OPENAI_DEPLOYMENT is required when DOCUMENT_PROCESSOR=azure-openai." });
+  }
+  if (value.DOCUMENT_PROCESSOR === "custom") {
+    if (!value.CUSTOM_OPENAI_BASE_URL) context.addIssue({ code: "custom", path: ["CUSTOM_OPENAI_BASE_URL"], message: "CUSTOM_OPENAI_BASE_URL is required when DOCUMENT_PROCESSOR=custom." });
+    if (!value.CUSTOM_OPENAI_MODEL) context.addIssue({ code: "custom", path: ["CUSTOM_OPENAI_MODEL"], message: "CUSTOM_OPENAI_MODEL is required when DOCUMENT_PROCESSOR=custom." });
+  }
   if (value.STORAGE_PROVIDER === "s3" && !value.S3_BUCKET) context.addIssue({ code: "custom", path: ["S3_BUCKET"], message: "S3_BUCKET is required when STORAGE_PROVIDER=s3." });
   if (Boolean(value.S3_ACCESS_KEY_ID) !== Boolean(value.S3_SECRET_ACCESS_KEY)) context.addIssue({ code: "custom", path: ["S3_ACCESS_KEY_ID"], message: "Set both S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY, or neither when using workload identity." });
   if (Boolean(value.SMTP_USER) !== Boolean(value.SMTP_PASSWORD)) context.addIssue({ code: "custom", path: ["SMTP_USER"], message: "Set both SMTP_USER and SMTP_PASSWORD, or neither for an approved unauthenticated relay." });
@@ -178,6 +214,9 @@ const envSchema = z.object({
     if (!value.APPROVED_AI_PROVIDERS.includes(value.DOCUMENT_PROCESSOR)) issue("APPROVED_AI_PROVIDERS", `Production processor ${value.DOCUMENT_PROCESSOR} requires documented vendor approval.`);
     if (!value.AI_PROVIDER_APPROVAL_ID) issue("AI_PROVIDER_APPROVAL_ID", "An organization-owned provider approval record is required before production AI processing.");
   }
+  if (value.DOCUMENT_PROCESSOR === "ollama" && new URL(value.OLLAMA_BASE_URL).protocol !== "https:") issue("OLLAMA_BASE_URL", "Production OLLAMA_BASE_URL must use HTTPS; plaintext local endpoints are not permitted with real applicant data.");
+  if (value.DOCUMENT_PROCESSOR === "custom" && value.CUSTOM_OPENAI_BASE_URL && new URL(value.CUSTOM_OPENAI_BASE_URL).protocol !== "https:") issue("CUSTOM_OPENAI_BASE_URL", "Production CUSTOM_OPENAI_BASE_URL must use HTTPS.");
+  if (value.DOCUMENT_PROCESSOR === "azure-openai" && value.AZURE_OPENAI_ENDPOINT && new URL(value.AZURE_OPENAI_ENDPOINT).protocol !== "https:") issue("AZURE_OPENAI_ENDPOINT", "Production AZURE_OPENAI_ENDPOINT must use HTTPS.");
 });
 
 export function parseEnvironment(input: NodeJS.ProcessEnv) {

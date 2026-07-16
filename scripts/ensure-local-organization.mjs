@@ -2,7 +2,7 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { resolveLocalDatabaseUrl } from "./local-database.mjs";
 
-if ((process.env.DATA_MODE ?? "synthetic") !== "synthetic") throw new Error("Real applicant-data mode is not implemented or approved.");
+if ((process.env.DATA_MODE ?? "synthetic") !== "synthetic") throw new Error("Local SQLite tooling only runs in the synthetic profile. Production deployments use PostgreSQL, start blank, and are claimed once through /setup (see docs/production-operations.md).");
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is missing. Copy .env.example to .env before running db:setup.");
 resolveLocalDatabaseUrl(process.cwd(), process.env.DATABASE_URL);
 

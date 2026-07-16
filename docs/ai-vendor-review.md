@@ -11,6 +11,10 @@ Reviewed July 14, 2026. This is an engineering due-diligence record, not legal a
 | Cerebras Inference | Official support states prompt content, requests/responses, chat/transaction logs, and model inputs/outputs are not retained; organization/account data and usage metrics remain. Terms say service content is not used for model training. | Conditional. Require DPA/security and region/subprocessor validation, contractual confirmation of the support-page statement, incident terms, and a dedicated key. |
 | Mistral API | Default API handling may retain input/output for 30 rolling days for abuse monitoring. Training and privacy controls exist; ZDR is available only on eligible Scale plans/stateless calls, and Labs models can be used for training regardless of opt-out. | Block by default. Consider only eligible paid stateless API with ZDR and training disabled, Labs disabled, DPA/region/subprocessor review, and a dedicated key. |
 
+## Expanded provider catalog (v1.0.0-rc.2)
+
+The runtime additionally supports OpenAI, Azure OpenAI, xAI, DeepSeek, Together AI, Fireworks AI, Cohere, Perplexity, self-hosted Ollama, and operator-defined custom OpenAI-compatible endpoints. **No official-policy review has been performed for these vendors in this repository.** Their disposition is *Block by default*: production selection still requires the deploying organization to complete its own vendor review, list the provider in `APPROVED_AI_PROVIDERS`, and record `AI_PROVIDER_APPROVAL_ID` as described below. Self-hosted Ollama and custom gateways shift the retention question onto the operator's own infrastructure, which the same approval record must cover.
+
 ## Required approval record
 
 For each approved provider, record the legal entity, product/tier, model IDs, endpoint/region, DPA date, retention and deletion behavior, training setting, human-access conditions, subprocessors, transfer mechanism, breach-notification term, key owner, spend limit, approval owner, approval date, and next review date. Re-review on provider, model, endpoint, or terms changes and at least annually.

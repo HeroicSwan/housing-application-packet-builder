@@ -31,7 +31,7 @@ describe("synthetic seed boundary", () => {
   it("rejects a non-synthetic data mode before opening the database", () => {
     const result = runSeed({ DATA_MODE: "real", SYNTHETIC_SEED_CONTEXT: "local-reset" });
     expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain("Real applicant-data mode is not implemented or approved.");
+    expect(result.stderr).toContain("Synthetic seeding never runs outside the synthetic profile.");
   });
 
   it("rejects a non-synthetic backup before opening the database", () => {

@@ -56,7 +56,7 @@ export const storageSetupSchema = z.object({
 export const malwareSetupSchema = z.object({ scanner: z.enum(["none", "clamav"]), host: text(1, 253), port: z.number().int().min(1).max(65535) });
 
 export const aiSetupSchema = z.object({
-  provider: z.enum(["disabled", "anthropic", "gemini", "groq", "openrouter", "sambanova", "cerebras", "mistral"]),
+  provider: z.enum(["disabled", "anthropic", "gemini", "groq", "openrouter", "sambanova", "cerebras", "mistral", "openai", "azure-openai", "xai", "deepseek", "together", "fireworks", "cohere", "perplexity", "ollama", "custom"]),
   model: optionalText(200),
   approvalId: optionalText(200),
   providerRetentionAcknowledged: z.boolean(),

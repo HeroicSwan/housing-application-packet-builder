@@ -13,7 +13,7 @@ const dataMode = process.env.DATA_MODE ?? "synthetic";
 const seedContext = process.env.SYNTHETIC_SEED_CONTEXT;
 const syntheticOrganizationId = "synthetic-demo-organization";
 if (!databaseUrl) throw new Error("DATABASE_URL is required for synthetic seeding.");
-if (dataMode !== "synthetic") throw new Error("Real applicant-data mode is not implemented or approved.");
+if (dataMode !== "synthetic") throw new Error("Synthetic seeding never runs outside the synthetic profile. Production databases start blank and are claimed once through /setup.");
 if (seedContext === "e2e") {
   if (process.env.E2E_DATABASE_URL !== databaseUrl) throw new Error("The E2E seed requires matching isolated database settings.");
   resolveE2eDatabaseUrl(repositoryRoot, databaseUrl);

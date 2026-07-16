@@ -6,7 +6,7 @@ import { resolveLocalDatabaseUrl } from "./local-database.mjs";
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is missing. Copy .env.example to .env before running demo:reset.");
 const { databasePath } = resolveLocalDatabaseUrl(process.cwd(), process.env.DATABASE_URL);
 const dataMode = process.env.DATA_MODE ?? "synthetic";
-if (dataMode !== "synthetic") throw new Error("Real applicant-data mode is not implemented or approved.");
+if (dataMode !== "synthetic") throw new Error("Local SQLite tooling only runs in the synthetic profile. Production deployments use PostgreSQL, start blank, and are claimed once through /setup (see docs/production-operations.md).");
 if (!process.argv.includes("--yes")) {
   throw new Error("DESTRUCTIVE SYNTHETIC RESET NOT RUN. This deletes and recreates the disposable demo database. Confirm with `npm run demo:reset -- --yes`.");
 }

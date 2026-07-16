@@ -116,4 +116,39 @@ describe("AI provider connection probe", () => {
     await expect(pending).resolves.toEqual({ status: "FAILED", code: "AI_PROBE_TIMEOUT" });
     expect(fetcher).toHaveBeenCalledOnce();
   });
+
+  const twoStepAdditions: { config: AiProbeConfig; modelUrl: string; inferenceUrl: string }[] = [
+    { config: { provider: "openai", model: "gpt-test", apiKey: key }, modelUrl: "https://api.openai.com/v1/models/gpt-test", inferenceUrl: "https://api.openai.com/v1/chat/completions" },
+    { config: { provider: "xai", model: "grok-test", apiKey: key }, modelUrl: "https://api.x.ai/v1/models/grok-test", inferenceUrl: "https://api.x.ai/v1/chat/completions" },
+    { config: { provider: "deepseek", model: "deepseek-test", apiKey: key }, modelUrl: "https://api.deepseek.com/v1/models/deepseek-test", inferenceUrl: "https://api.deepseek.com/v1/chat/completions" },
+  ];
+
+  it.each(twoStepAdditions)("checks the exact $config.provider model before one tiny inference", async ({ config, modelUrl, inferenceUrl }) => {
+    const fetcher = successfulFetch();
+    await expect(probeAiProvider(config, fetcher)).resolves.toEqual({ status: "PASSED", code: "AI_PROVIDER_MODEL_OK" });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher.mock.calls[0][0]).toBe(modelUrl);
+    expect(fetcher.mock.calls[1][0]).toBe(inferenceUrl);
+  });
+
+  const inferenceOnlyAdditions: { config: AiProbeConfig; inferenceUrl: string }[] = [
+    { config: { provider: "together", model: "together-test", apiKey: key }, inferenceUrl: "https://api.together.xyz/v1/chat/completions" },
+    { config: { provider: "fireworks", model: "accounts/fireworks/models/test", apiKey: key }, inferenceUrl: "https://api.fireworks.ai/inference/v1/chat/completions" },
+    { config: { provider: "cohere", model: "command-test", apiKey: key }, inferenceUrl: "https://api.cohere.ai/compatibility/v1/chat/completions" },
+    { config: { provider: "perplexity", model: "sonar", apiKey: key }, inferenceUrl: "https://api.perplexity.ai/chat/completions" },
+  ];
+
+  it.each(inferenceOnlyAdditions)("probes $config.provider with a single one-token inference call", async ({ config, inferenceUrl }) => {
+    const fetcher = successfulFetch();
+    await expect(probeAiProvider(config, fetcher)).resolves.toEqual({ status: "PASSED", code: "AI_PROVIDER_MODEL_OK" });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher.mock.calls[0][0]).toBe(inferenceUrl);
+    expect(fetcher.mock.calls[0][1]?.method).toBe("POST");
+  });
+
+  it.each(["azure-openai", "ollama", "custom"] as const)("reports %s as UNSUPPORTED so the wizard never simulates a pass for environment-configured endpoints", async (provider) => {
+    const fetcher = successfulFetch();
+    await expect(probeAiProvider({ provider, model: "any-model", apiKey: key }, fetcher)).resolves.toEqual({ status: "UNSUPPORTED", code: "AI_PROVIDER_UNSUPPORTED" });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
 });

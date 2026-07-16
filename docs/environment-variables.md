@@ -91,8 +91,18 @@ Only `PASSED` satisfies a required production connection test. Synthetic mode ma
 | `SAMBANOVA_API_KEY` / `SAMBANOVA_MODEL` | SambaNova credential and model ID | Key required only when selected |
 | `CEREBRAS_API_KEY` / `CEREBRAS_MODEL` | Cerebras credential and model ID | Key required only when selected |
 | `MISTRAL_API_KEY` / `MISTRAL_MODEL` | Mistral credential and model ID | Key required only when selected |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | OpenAI credential and model ID | Key required only when selected |
+| `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_DEPLOYMENT` / `AZURE_OPENAI_API_VERSION` | Azure OpenAI credential, resource endpoint, deployment name, API version | Key, HTTPS endpoint, and deployment required when selected |
+| `XAI_API_KEY` / `XAI_MODEL` | xAI credential and model ID | Key required only when selected |
+| `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL` | DeepSeek credential and model ID | Key required only when selected; text-only models cannot read scans |
+| `TOGETHER_API_KEY` / `TOGETHER_MODEL` | Together AI credential and model ID | Key required only when selected |
+| `FIREWORKS_API_KEY` / `FIREWORKS_MODEL` | Fireworks AI credential and model ID | Key required only when selected |
+| `COHERE_API_KEY` / `COHERE_MODEL` | Cohere credential and model ID (compatibility API) | Key required only when selected |
+| `PERPLEXITY_API_KEY` / `PERPLEXITY_MODEL` | Perplexity credential and model ID | Key required only when selected |
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` / `OLLAMA_API_KEY` | Self-hosted Ollama endpoint, model, optional key | HTTPS required in production |
+| `CUSTOM_OPENAI_BASE_URL` / `CUSTOM_OPENAI_MODEL` / `CUSTOM_OPENAI_API_KEY` / `CUSTOM_OPENAI_PROVIDER_NAME` | Any other OpenAI-compatible endpoint (gateway, vLLM, LiteLLM, unlisted vendor) | Base URL and model required when selected; HTTPS required in production |
 
-Production should use `DOCUMENT_PROCESSOR=disabled` until an administrator has approved the exact provider, model, account tier, retention behavior, region, contract/DPA, and data categories. Provider configuration never bypasses human review.
+Credential material is validated only for the selected provider, so unrelated provider variables that happen to exist on a machine never block startup. Production should use `DOCUMENT_PROCESSOR=disabled` until an administrator has approved the exact provider, model, account tier, retention behavior, region, contract/DPA, and data categories. Provider configuration never bypasses human review.
 
 ## Upload and malware controls
 

@@ -1,6 +1,6 @@
 {
   "name": "housing-application-packet-builder",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "private": true,
   "engines": {
     "node": ">=22",
@@ -40,7 +40,9 @@
     "backup:verify": "node scripts/verify-backup.mjs",
     "backup:restore": "node scripts/restore-backup.mjs",
     "validate": "node scripts/validate.mjs",
-    "validate:live": "node scripts/run-service-gated-tests.mjs"
+    "validate:live": "node scripts/run-service-gated-tests.mjs",
+    "setup:blank": "node scripts/setup.mjs --blank",
+    "db:setup:blank": "node scripts/ensure-local-db.mjs && prisma db push --skip-generate"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"

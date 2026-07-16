@@ -2,7 +2,20 @@ import { env } from "@/lib/env";
 import { processingResultSchema, type DocumentProcessingInput, type DocumentProcessor } from "./types";
 import { extractionPrompt, parseExtractionJson } from "./prompt";
 
-type CompatibleConfig = { name: string; apiKey: string | undefined; model: string; endpoint: string; headers?: Record<string, string>; body?: Record<string, unknown> };
+type CompatibleConfig = {
+  name: string;
+  apiKey: string | undefined;
+  model: string;
+  endpoint: string;
+  headers?: Record<string, string>;
+  body?: Record<string, unknown>;
+  /** Header used to send the API key. Defaults to `Authorization` with a `Bearer` prefix (e.g. Azure uses `api-key`). */
+  apiKeyHeader?: string;
+  /** Providers such as local Ollama or keyless self-hosted gateways may run without an API key. */
+  requiresApiKey?: boolean;
+  /** Some providers reject `response_format`; the extraction prompt still demands JSON and parsing tolerates prose wrappers. */
+  omitResponseFormat?: boolean;
+};
 
 function contentFor(input: DocumentProcessingInput) {
   if (input.mimeType === "text/plain" || input.mimeType === "text/csv") return [{ type: "text", text: `Document filename: ${input.filename}\n\n${Buffer.from(input.bytes).toString("utf8")}` }];
@@ -15,14 +28,27 @@ function contentFor(input: DocumentProcessingInput) {
 export class OpenAICompatibleDocumentProcessor implements DocumentProcessor {
   constructor(private readonly config: CompatibleConfig) {}
 
+  private authHeaders(): Record<string, string> {
+    if (!this.config.apiKey) return {};
+    if (this.config.apiKeyHeader && this.config.apiKeyHeader.toLowerCase() !== "authorization") return { [this.config.apiKeyHeader]: this.config.apiKey };
+    return { Authorization: `Bearer ${this.config.apiKey}` };
+  }
+
   async processDocument(input: DocumentProcessingInput) {
-    if (!this.config.apiKey) throw new Error(`${this.config.name} processing is enabled but its API key is missing.`);
+    if (!this.config.apiKey && (this.config.requiresApiKey ?? true)) throw new Error(`${this.config.name} processing is enabled but its API key is missing.`);
     let response: Response | undefined;
     for (let attempt = 0; attempt < 4; attempt += 1) {
       response = await fetch(this.config.endpoint, {
         method: "POST",
-        headers: { Authorization: `Bearer ${this.config.apiKey}`, "Content-Type": "application/json", ...this.config.headers },
-        body: JSON.stringify({ model: this.config.model, temperature: 0.1, max_tokens: 1800, response_format: { type: "json_object" }, messages: [{ role: "system", content: extractionPrompt }, { role: "user", content: contentFor(input) }], ...this.config.body }),
+        headers: { ...this.authHeaders(), "Content-Type": "application/json", ...this.config.headers },
+        body: JSON.stringify({
+          model: this.config.model,
+          temperature: 0.1,
+          max_tokens: 1800,
+          ...(this.config.omitResponseFormat ? {} : { response_format: { type: "json_object" } }),
+          messages: [{ role: "system", content: extractionPrompt }, { role: "user", content: contentFor(input) }],
+          ...this.config.body,
+        }),
         signal: AbortSignal.timeout(env.DOCUMENT_PROCESSOR_TIMEOUT_MS),
       });
       if (response.ok || ![429, 500, 502, 503, 504].includes(response.status) || attempt === 3) break;
