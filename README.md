@@ -1,114 +1,60 @@
 # Housing Application Packet Builder
 
 ![status](https://img.shields.io/badge/status-work%20in%20progress-orange)
-![stage](https://img.shields.io/badge/stage-release%20candidate-yellow)
+![version](https://img.shields.io/badge/version-v1.0.0--rc.1-yellow)
 ![data](https://img.shields.io/badge/data-synthetic%20only-red)
 ![production](https://img.shields.io/badge/production%20use-not%20certified-critical)
 ![tests](https://img.shields.io/badge/tests-248%20passing-brightgreen)
-![Next.js](https://img.shields.io/badge/Next.js-16-black)
-![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 
-Applying for housing means filling out the same information over and over, across forms that all want it in a slightly different shape. This tool is for the caseworkers doing that work: upload a household's documents once, review what was pulled out of them, and let the app map those reviewed values into whatever application form the agency actually wants.
+Applying for housing means writing the same information onto form after form, each one wanting it in a slightly different shape. This tool is for the caseworkers doing that: upload a household's documents once, have staff review what was pulled out of them, and map those reviewed values into whatever application the agency actually wants — with a full audit trail behind it.
 
 **It assists people. It does not decide anything.**
 
 ---
 
-## 🚧 Read this first — this is a work in progress
+## How far along it is
 
-I'm publishing this openly so it can be read, evaluated, and improved. It is **not finished software**, and I'd rather be blunt about that than have someone find out the hard way. Here is every warning that matters, in one place.
+**Honest answer: it works, but it isn't finished, and it hasn't earned real data yet.**
 
-**1. It's a work in progress.** Version `0.1.0`, untagged. The code is functional and well tested, but the project is still moving. APIs, schema, and behaviour can change without notice.
+- **Version `v1.0.0-rc.1`** — a release candidate, not a production release.
+- **What's done:** the full workflow runs end to end on synthetic data. 248 tests pass, plus browser and accessibility checks, a production build, and clean secret scans. All ten automated gates in `npm run validate` are green.
+- **What's not done:** the remaining work is mostly *not code*. It needs an independent penetration test, live OCR accuracy thresholds, real agency form acceptance, manual screen-reader testing, moderated caseworker sessions, and privacy/legal sign-off.
+- **The accurate label:** an open-source release candidate for synthetic demonstrations, local nonprofit evaluation, and deployment preparation. Passing automated checks is **not** legal or organizational approval.
 
-**2. Do not put real applicant data in it.** Not yet — not in a demo, not "just to try it." It ships in synthetic mode on purpose: SQLite, seeded fake households, a mock extractor, and no external services. Real housing applications contain some of the most sensitive information a person has, and this project has not earned the right to hold it yet.
+Run `npm run validate` yourself — it reports the ten gates it can check *and* the ten blockers it can't, each with a named owner. Its verdict today is `SAFE_CHECKS_PASS_WITH_EXTERNAL_BLOCKERS`.
 
-**3. It is not production-certified.** It's an *open-source release candidate for synthetic demonstrations, local nonprofit evaluation, and deployment preparation.* Nothing more. Passing the automated checks is **not** legal, privacy, or organizational approval.
+## Safety
 
-**4. The open gates are mostly not code.** The remaining blockers need real infrastructure, authorized people, and organizational decisions — an independent penetration test, live OCR accuracy thresholds, real agency form acceptance, manual accessibility testing with a screen reader, moderated caseworker sessions, and privacy/legal sign-off. See [Before it can handle real data](#before-it-can-handle-real-data) for the full list.
+**Do not put real applicant data in this yet.** Not in a demo, not "just to try it." It ships in synthetic mode on purpose — SQLite, seeded fake households, a mock extractor, no external services. Real housing applications hold some of the most sensitive information a person has, and this project hasn't earned the right to hold it.
 
-**5. The deep security scan was canceled before it finished.** It surfaced 27 candidate clusters that were **never validated**. They were inspected and remediated anyway, but a canceled scan is **not** a penetration test. Details in [About the security scan](#about-the-security-scan).
+**What protects the data:**
 
-**6. Any API key that ever touched a chat window must be rotated.** Deleting a key from the checkout does not rotate it. Treat every previously exposed provider key as compromised.
+- **Encryption** — AES-256-GCM authenticated encryption for stored documents, templates, exports, and secrets. Local and S3 storage both encrypt *before* writing. Envelopes carry key IDs and auth tags, and anything unknown or unauthenticated **fails closed**.
+- **Accounts** — bcrypt password hashing, TOTP MFA with recovery codes, secure HTTP-only sessions with idle timeout, login rate limiting and lockout, role-based permissions, and organization scoping. PostgreSQL row-level security and least-privilege roles for production.
+- **Uploads** — uploads are an attack surface, so PDFs are screened for active content (JavaScript, embedded files, launch actions, XFA, submit actions), with hex-escaped names normalized first so nothing sneaks past. Plus type/size/signature checks, page and dimension limits, and optional ClamAV scanning.
+- **Integrity** — signatures invalidate when the underlying data changes, approvals are digest-verified and atomically claimed, delivery is idempotent with retries, and deletion requires two administrators and respects legal holds.
 
-**7. The software never decides anything.** No eligibility, no ranking, no credibility scoring, no legal decisions. A human reviews every extracted value before it counts. If you're looking for automated decisioning, this deliberately isn't it.
+**What you should be skeptical about:**
 
-**If you only take one thing from this:** clone it, run it on the synthetic data, read the code, tell me what's wrong with it. Just don't point it at a real family's paperwork yet.
+- **The deep security scan was canceled before it finished.** It surfaced 27 candidate clusters that were **never validated**. They were inspected and remediated anyway — but a canceled scan is **not** a penetration test, and an independent pentest is still outstanding.
+- **Any API key that ever touched a chat window must be rotated.** Deleting a key from the checkout does not rotate it. Treat every previously exposed key as compromised.
+- **The software never decides anything** — no eligibility, no ranking, no credibility scoring, no legal decisions. Extracted values are *proposals*; a human confirms every one before it counts. Caseworkers and reviewers stay responsible for every consequential decision.
 
----
+**Ground rule:** never enter, upload, seed, paste, log, or screenshot real applicant information. Never put keys, passwords, or document contents into issues or test output.
 
-## Contents
+## How to run it
 
-- [What it does](#what-it-does)
-- [What it deliberately doesn't do](#what-it-deliberately-doesnt-do)
-- [Where the project stands](#where-the-project-stands)
-- [Quick start](#quick-start)
-- [How it protects data](#how-it-protects-data)
-- [Testing](#testing)
-- [About the security scan](#about-the-security-scan)
-- [Before it can handle real data](#before-it-can-handle-real-data)
-- [Documentation](#documentation)
-- [Credits](#credits)
-- [License](#license)
-
----
-
-## What it does
-
-The whole thing is one workflow, start to finish:
-
-1. **Create a case** — a client case and household profile.
-2. **Upload documents** — PDFs, photos, and supporting paperwork.
-3. **Extract proposed values** — using a mock processor locally, or a configured AI/OCR provider.
-4. **Staff review** — a human corrects, approves, or rejects every extracted value. Nothing is trusted automatically.
-5. **Map into templates** — reviewed values flow into application forms.
-6. **Fill the gaps** — guided completion of missing, conflicting, or expired fields.
-7. **Generate the form** — both generated PDFs and real agency AcroForm PDFs are supported.
-8. **Sign & consent** — typed electronic signatures and versioned consent capture.
-9. **Submit for review** — a reviewer approves or returns it.
-10. **Build the packet** — the completed application plus its supporting documents.
-11. **Deliver** — over SMTP or an authenticated HTTPS API.
-12. **Keep the record** — audit history, retention, legal holds, exports, deletion approvals, and download controls.
-
-The key design rule: **extracted values are proposals, never facts.** A human confirms everything before it counts.
-
-## What it deliberately doesn't do
-
-This matters more than the feature list, so it's stated plainly:
-
-- ❌ It does **not** determine eligibility.
-- ❌ It does **not** rank or score applicants.
-- ❌ It does **not** assess credibility.
-- ❌ It does **not** make legal decisions.
-
-Caseworkers and reviewers remain responsible for every consequential decision. The software's job is to remove retyping and transcription errors — not judgement.
-
-## Where the project stands
-
-| | |
-|---|---|
-| **Version** | `0.1.0` (untagged) |
-| **Honest label** | Open-source release candidate for synthetic demonstrations, local nonprofit evaluation, and deployment preparation |
-| **Ready for** | Local/synthetic demos, evaluation by a nonprofit, deployment preparation |
-| **Not ready for** | Real applicant data, production nonprofit use |
-| **Suggested release tag** | `v1.0.0-rc.1` or `v1.0.0-beta` — **not** a production-certified `v1.0.0` |
-
-The code is functional and well covered by tests. What's missing isn't mostly code — it's the external gates: infrastructure, an independent penetration test, human accessibility and usability testing, and organizational/legal approval.
-
----
-
-## Quick start
-
-**You need:** Node.js 22+ and npm 10+. That's it — no Docker, no hosted database, no paid AI account.
+You need **Node.js 22+** and **npm 10+**. No Docker, no database to host, no paid AI account.
 
 ```bash
-npm run setup   # creates .env, local secrets, prisma/dev.db, and seeds synthetic records
+npm run setup   # creates .env, local secrets, prisma/dev.db, and seeds synthetic data
 npm run dev     # http://localhost:3000
 ```
 
-`npm run setup` is safe to re-run: it never overwrites an existing `.env`, database, or stored file.
+`npm run setup` is safe to re-run — it never overwrites an existing `.env`, database, or stored file.
 
-**Synthetic demo accounts** (local evaluation only — production config rejects these):
+Sign in with any of the synthetic demo accounts (local evaluation only — production config rejects them):
 
 | Account | Role |
 |---|---|
@@ -116,201 +62,48 @@ npm run dev     # http://localhost:3000
 | `reviewer@example.org` | Reviewer |
 | `admin@example.org` | Administrator |
 
-All three use the demo password `DemoHousing2026!`.
+All three use the password `DemoHousing2026!`.
 
-Useful extras:
-
-```bash
-npm run healthcheck          # check a running server
-npm run demo:reset -- --yes  # destructive: wipe & reseed the guarded local demo DB only
-npm run validate             # full readiness report (dated Markdown + machine-readable)
-```
-
-`npm run validate` is the one to run before any release conversation — it separates what's automatically verifiable from what still needs a human or real infrastructure.
-
----
-
-## How it protects data
-
-This app is built to hold sensitive household information, so the defenses are the point — not an afterthought.
-
-### Accounts and access
-
-- **bcrypt** password hashing.
-- **MFA via TOTP**, with one-time recovery codes and enforced enrollment for organizations that require it.
-- HTTP-only, secure session cookies with expiry and idle timeout.
-- Password-reset tokens are hashed, single-use, expiring, and revoke their siblings.
-- Atomic login rate limiting plus failed-login counting and lockout.
-- Role-based permissions (administrator, supervisor, reviewer, caseworker, auditor, applicant) and organization/tenant scoping.
-- Reviewer-assignment enforcement on field reviews, notes, overrides, returns, and approvals.
-- **PostgreSQL row-level security** and separate least-privilege database roles for production.
-
-### Encryption
-
-- **AES-256-GCM authenticated encryption** for stored documents, templates, exports, setup secrets, and encrypted configuration.
-- Both local and S3 storage encrypt **before** writing — data is never written in the clear.
-- Encryption envelopes carry key IDs and auth tags; **unknown or unauthenticated envelopes fail closed**.
-- Old keys can stay configured during rotation, so rotating doesn't strand existing data.
-- Passwords are bcrypt-hashed; session, reset, and MFA tokens are stored only as hashes.
-- Provider credentials stay server-side and are never returned to the browser.
-- Production demands a real `DATA_ENCRYPTION_KEY`, a key ID, and managed secret storage.
-
-### Documents and PDFs
-
-Uploads are a genuine attack surface, so they're treated like one:
-
-- Type, extension, size, and binary-signature checks; PDF/PNG/JPEG validation.
-- **Active content is rejected** — embedded files, JavaScript, launch actions, XFA, and form-submission actions. Hex-escaped action names are normalized first so they can't sneak past.
-- Page-count and image-dimension limits, plus raw object/stream complexity checks *before* full parsing.
-- Optional **ClamAV** malware scanning.
-- Documents can be quarantined, reviewed, deleted, and marked unavailable.
-
-### Workflow integrity
-
-- Versioned packets and templates, with compatibility checks.
-- **Signatures invalidate when the underlying data changes.**
-- Approval digest verification and atomic approval claims (no stale approvals).
-- Delivery idempotency keys, deterministic SMTP message IDs, retry/backoff/dead-letter, and stale-worker recovery.
-- Expiring secure download links and atomic export download limits.
-- Legal holds and **two-administrator** deletion approval.
-- Setup revision checks so untested configuration can't be activated.
-
-### Outbound connections
-
-- HTTPS-only production endpoints; host/port allowlists for internal services.
-- Metadata and loopback targets blocked.
-- SMTP, S3, and ClamAV connections pin their resolved address in production.
-- A safe outbound HTTP helper with timeout, response-size, header, and DNS controls.
-
----
-
-## Testing
-
-`npm run validate` runs ten automated gates and, crucially, reports what it *can't* check separately. The last full run on this build returned:
-
-> **Verdict: `SAFE_CHECKS_PASS_WITH_EXTERNAL_BLOCKERS`** — every automated gate passed; the remaining blockers need real infrastructure or authorized people.
-
-| Gate | Result |
-|---|---|
-| Production PostgreSQL schema validation | ✅ pass |
-| Repository secret scan | ✅ pass — 360 files, no values printed |
-| Git-history secret scan | ✅ pass — 3 commits, 686 blobs |
-| ESLint | ✅ pass |
-| TypeScript typecheck | ✅ pass |
-| Unit + integration tests | ✅ **248 passed**, 5 service-gated skipped (35 files) |
-| Synthetic evaluation harness | ✅ pass — includes a 120-applicant synthetic run |
-| Production build | ✅ pass |
-| Browser / E2E / accessibility | ✅ **11 passed** |
-| Dependency audit | ✅ 0 vulnerabilities |
-
-Also on record: synthetic AcroForm acceptance round-tripped 8 discovered/mapped fields, and the focused remediation tests passed 20/20.
-
-The validator deliberately lists ten **live/organizational blockers** it cannot satisfy on its own — ClamAV, OCR accuracy, AI-provider smoke tests, PostgreSQL RLS, worker supervision, backup restore, TLS/monitoring, caseworker usability, manual accessibility, and privacy/legal/pentest approvals — each with a named owner. Those are the same items listed in [Before it can handle real data](#before-it-can-handle-real-data).
+Other useful commands:
 
 ```bash
-npm run validate               # all ten gates + a dated report
-
-npm run lint
-npm run typecheck
-npm test
-npm run test:e2e
-npm run build
-
-npm run security:secrets       # repository secret scan
-npm run security:history       # git-history secret scan
-npm run security:dependencies  # dependency audit
+npm run validate             # all ten gates + a dated readiness report
+npm test                     # unit + integration
+npm run test:e2e             # browser + accessibility
+npm run demo:reset -- --yes  # destructive: wipe & reseed the local demo DB only
 ```
 
-```bash
-npm run lint
-npm run typecheck
-npm test
-npm run test:e2e
-npm run build
+## How to use it
 
-npm run security:secrets       # repository secret scan
-npm run security:dependencies  # dependency audit
-```
+The whole product is one workflow. Signed in as a caseworker:
 
-The E2E run builds its own dedicated SQLite database and Playwright-owned server — it never touches your development data.
+1. **Create a case** for a household.
+2. **Upload their documents** — PDFs and photos.
+3. **Review the extraction.** The app proposes values; you correct, approve, or reject each one. Nothing is trusted automatically — this is the step the whole design is built around.
+4. **Pick an application template** and let the reviewed values map into it. Generated PDFs and real agency AcroForm PDFs both work.
+5. **Fill the gaps** the app flags as missing, conflicting, or expired.
+6. **Sign and consent** — typed electronic signature, versioned consent capture.
+7. **Send it for review.** A reviewer approves or returns it.
+8. **Deliver the packet** — the completed application plus supporting documents, over SMTP or an authenticated HTTPS API.
 
-## About the security scan
+Everything leaves an audit trail: retention, legal holds, exports, deletion approvals, and download controls.
 
-Worth being straight about this, because the numbers look alarming out of context.
+Locally, extraction runs on a deterministic **mock processor**, so you can walk the entire flow with zero API keys. Optional server-side adapters exist for Anthropic, Gemini, Groq, OpenRouter, SambaNova, Cerebras, and Mistral if you configure one.
 
-A deep security scan ran with 6 independent discovery workers over 1,485 scoped worklist rows each. It produced **63 raw observations**, which deduplicated into **27 candidate clusters** — and then **the scan was canceled before centralized validation.**
+## How it was built
 
-So, honestly:
+I built this with **GPT** and **Claude**, and I'd rather say so plainly than let anyone assume otherwise.
 
-- Those 27 items were **never confirmed as vulnerabilities**. They're candidates, not findings.
-- Their source paths were inspected anyway, and code-level remediations were applied.
-- The focused remediation tests (20/20) and the full safe validator pass.
-- **A canceled scan is not a penetration test.** An independent pentest is still an open blocker.
+The process, honestly: I set the direction and the constraints, the models did a lot of the heavy lifting — code generation, test coverage, security review, documentation — and I reviewed the output and decided what actually shipped. Where they were useful, they were *very* useful. Where they were confidently wrong, that's exactly why every extracted value in this app needs a human to approve it. The irony isn't lost on me.
 
-## Before it can handle real data
-
-These are the real gates. Most need infrastructure, authorized people, or an organizational decision — not more code.
-
-**Infrastructure & operations**
-- [ ] ClamAV EICAR quarantine test
-- [ ] PostgreSQL RLS testing against disposable production-like databases
-- [ ] Production worker supervision and retry testing
-- [ ] Backup and restore drill using PostgreSQL tooling
-- [ ] TLS deployment health and authenticated monitoring
-- [ ] Incident-response and disaster-recovery exercises
-
-**AI / extraction quality**
-- [ ] Live OCR-quality corpus and an agreed accuracy threshold
-- [ ] Live AI-provider smoke tests
-- [ ] AI-vendor contract and data-retention approval
-
-**Real-world fit**
-- [ ] Real agency AcroForm template acceptance and mapping
-- [ ] Real submission portal/API approval and configuration
-
-**Human testing**
-- [ ] Manual accessibility testing — keyboard, screen reader, zoom, contrast
-- [ ] Moderated caseworker usability testing
-
-**Security, legal & organizational**
-- [ ] Independent penetration test
-- [ ] Privacy, legal, retention, consent, and data-processing approval
-- [ ] **Rotation of every API key previously pasted into chat**
-- [ ] Organizational approval to process real applicant data
-
-> On that key-rotation item: removing a key from the current checkout does **not** rotate it. Any provider key that was ever exposed should be treated as compromised and rotated at the provider.
-
-**Ground rule for contributors and evaluators:** never enter, upload, seed, paste, log, screenshot, or attach real applicant information. Never put provider keys, passwords, session values, or document contents into issues or test output.
-
----
+The scope, the judgement calls, and any mistakes are mine.
 
 ## Documentation
 
-**Start here**
 - [Local development](./docs/local-development.md) · [Environment variables](./docs/environment-variables.md) · [Architecture](./docs/architecture.md)
-
-**Setup & operations**
-- [Administrator setup](./docs/administrator-setup.md) · [Setup connection tests](./docs/setup-connection-tests.md)
-- [Operator runbook](./docs/operator-runbook.md) · [Production operations](./docs/production-operations.md)
-- [Backup & restore evidence](./docs/backup-restore-evidence.md) · [Troubleshooting](./docs/troubleshooting.md)
-
-**Security, privacy & AI**
 - [Security policy](./SECURITY.md) · [Data handling](./docs/data-handling.md) · [Responsible AI](./RESPONSIBLE_AI.md)
-- [Security hardening review](./docs/security-hardening/hardening.md) · [Privacy/data-flow review](./docs/privacy-data-flow-review.md)
-- [AI vendor review](./docs/ai-vendor-review.md) · [Incident response](./docs/incident-response.md)
-
-**Release**
-- [Release readiness record](./docs/release-readiness.md) · [Version 1 criteria](./docs/version-1-criteria.md)
-- [Release process](./docs/release-process.md) · [Changelog](./CHANGELOG.md)
-
-**Community**
-- [Contributing](./CONTRIBUTING.md) · [Support](./SUPPORT.md) · [Code of conduct](./CODE_OF_CONDUCT.md)
-
-## Credits
-
-I built this with **GPT** and **Claude**. They did a lot of the heavy lifting — code generation, test coverage, security review, and documentation — while I set the direction, reviewed the output, and decided what actually shipped. It's been a genuinely collaborative way to build, and I'd rather say so up front than pretend otherwise.
-
-The judgement calls, the scope, and any mistakes are mine.
+- [Release readiness](./docs/release-readiness.md) · [Version 1 criteria](./docs/version-1-criteria.md) — the full blocker list
+- [Contributing](./CONTRIBUTING.md) · [Support](./SUPPORT.md)
 
 ## License
 
