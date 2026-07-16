@@ -28,7 +28,7 @@ jobs:
       POSTGRES_TEST_ADMIN_URL: postgresql://postgres:test-postgres-owner-password@127.0.0.1:5432/hapb_test
       POSTGRES_TEST_APP_URL: postgresql://hapb_ci_app:test-postgres-role-password@127.0.0.1:5432/hapb_test
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with: { node-version: 22, cache: npm }
       - run: npm ci
