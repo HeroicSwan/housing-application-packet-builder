@@ -1,7 +1,9 @@
 # Housing Application Packet Builder
 
-![status](https://img.shields.io/badge/status-release%20candidate-orange)
+![status](https://img.shields.io/badge/status-work%20in%20progress-orange)
+![stage](https://img.shields.io/badge/stage-release%20candidate-yellow)
 ![data](https://img.shields.io/badge/data-synthetic%20only-red)
+![production](https://img.shields.io/badge/production%20use-not%20certified-critical)
 ![tests](https://img.shields.io/badge/tests-248%20passing-brightgreen)
 ![Next.js](https://img.shields.io/badge/Next.js-16-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
@@ -11,13 +13,27 @@ Applying for housing means filling out the same information over and over, acros
 
 **It assists people. It does not decide anything.**
 
-> ### ⚠️ Read this first
->
-> This is a **release candidate for synthetic demos, local evaluation, and deployment prep** — *not* production-certified software.
->
-> **Do not put real applicant data in it yet.** A number of gates are still open, and most of them can't be closed by writing code — they need real infrastructure, a penetration test, legal/privacy sign-off, and an actual organization saying yes. See [Before it can handle real data](#before-it-can-handle-real-data).
->
-> Out of the box it runs entirely on synthetic data, SQLite, and a mock extractor. No cloud account, no API keys, no Docker.
+---
+
+## 🚧 Read this first — this is a work in progress
+
+I'm publishing this openly so it can be read, evaluated, and improved. It is **not finished software**, and I'd rather be blunt about that than have someone find out the hard way. Here is every warning that matters, in one place.
+
+**1. It's a work in progress.** Version `0.1.0`, untagged. The code is functional and well tested, but the project is still moving. APIs, schema, and behaviour can change without notice.
+
+**2. Do not put real applicant data in it.** Not yet — not in a demo, not "just to try it." It ships in synthetic mode on purpose: SQLite, seeded fake households, a mock extractor, and no external services. Real housing applications contain some of the most sensitive information a person has, and this project has not earned the right to hold it yet.
+
+**3. It is not production-certified.** It's an *open-source release candidate for synthetic demonstrations, local nonprofit evaluation, and deployment preparation.* Nothing more. Passing the automated checks is **not** legal, privacy, or organizational approval.
+
+**4. The open gates are mostly not code.** The remaining blockers need real infrastructure, authorized people, and organizational decisions — an independent penetration test, live OCR accuracy thresholds, real agency form acceptance, manual accessibility testing with a screen reader, moderated caseworker sessions, and privacy/legal sign-off. See [Before it can handle real data](#before-it-can-handle-real-data) for the full list.
+
+**5. The deep security scan was canceled before it finished.** It surfaced 27 candidate clusters that were **never validated**. They were inspected and remediated anyway, but a canceled scan is **not** a penetration test. Details in [About the security scan](#about-the-security-scan).
+
+**6. Any API key that ever touched a chat window must be rotated.** Deleting a key from the checkout does not rotate it. Treat every previously exposed provider key as compromised.
+
+**7. The software never decides anything.** No eligibility, no ranking, no credibility scoring, no legal decisions. A human reviews every extracted value before it counts. If you're looking for automated decisioning, this deliberately isn't it.
+
+**If you only take one thing from this:** clone it, run it on the synthetic data, read the code, tell me what's wrong with it. Just don't point it at a real family's paperwork yet.
 
 ---
 
@@ -170,22 +186,40 @@ Uploads are a genuine attack surface, so they're treated like one:
 
 ## Testing
 
-Everything below was verified on the current build:
+`npm run validate` runs ten automated gates and, crucially, reports what it *can't* check separately. The last full run on this build returned:
 
-| Check | Result |
+> **Verdict: `SAFE_CHECKS_PASS_WITH_EXTERNAL_BLOCKERS`** — every automated gate passed; the remaining blockers need real infrastructure or authorized people.
+
+| Gate | Result |
 |---|---|
-| Unit + integration tests | **248 passed**, 5 service-gated skipped (35 files passed, 5 skipped) |
-| Browser / E2E / accessibility | **11 passed** |
-| Production build | passed |
-| ESLint + TypeScript | passed |
-| Repository + git-history secret scans | passed (360 files scanned, no values printed) |
-| Dependency audit | no high-severity vulnerabilities |
-| PostgreSQL production schema validation | passed |
-| Synthetic evaluation harness | passed — includes a 120-applicant synthetic run |
-| Synthetic AcroForm acceptance | round-tripped 8 discovered/mapped fields |
-| Focused remediation tests | 20/20 |
+| Production PostgreSQL schema validation | ✅ pass |
+| Repository secret scan | ✅ pass — 360 files, no values printed |
+| Git-history secret scan | ✅ pass — 3 commits, 686 blobs |
+| ESLint | ✅ pass |
+| TypeScript typecheck | ✅ pass |
+| Unit + integration tests | ✅ **248 passed**, 5 service-gated skipped (35 files) |
+| Synthetic evaluation harness | ✅ pass — includes a 120-applicant synthetic run |
+| Production build | ✅ pass |
+| Browser / E2E / accessibility | ✅ **11 passed** |
+| Dependency audit | ✅ 0 vulnerabilities |
 
-That's all ten automated gates in `npm run validate` green.
+Also on record: synthetic AcroForm acceptance round-tripped 8 discovered/mapped fields, and the focused remediation tests passed 20/20.
+
+The validator deliberately lists ten **live/organizational blockers** it cannot satisfy on its own — ClamAV, OCR accuracy, AI-provider smoke tests, PostgreSQL RLS, worker supervision, backup restore, TLS/monitoring, caseworker usability, manual accessibility, and privacy/legal/pentest approvals — each with a named owner. Those are the same items listed in [Before it can handle real data](#before-it-can-handle-real-data).
+
+```bash
+npm run validate               # all ten gates + a dated report
+
+npm run lint
+npm run typecheck
+npm test
+npm run test:e2e
+npm run build
+
+npm run security:secrets       # repository secret scan
+npm run security:history       # git-history secret scan
+npm run security:dependencies  # dependency audit
+```
 
 ```bash
 npm run lint
