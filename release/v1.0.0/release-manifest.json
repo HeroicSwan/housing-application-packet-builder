@@ -1,0 +1,32 @@
+{
+  "name": "housing-application-packet-builder",
+  "version": "1.0.0",
+  "releaseTag": "v1.0.0",
+  "status": "stable",
+  "syntheticOnly": true,
+  "validation": {
+    "safeChecks": "10/10",
+    "unitIntegrationPassed": 205,
+    "unitIntegrationSkipped": 5,
+    "browserTestsPassed": 11,
+    "syntheticApplicants": 120,
+    "dependencyAuditHighSeverity": 0
+  },
+  "contents": [
+    "README.md",
+    "RELEASE_NOTES.md",
+    "GITHUB_RELEASE_BODY.md",
+    "RELEASE_CHECKLIST.md",
+    "RELEASE_RESEARCH.md"
+  ],
+  "prohibitedContents": [
+    ".env",
+    "database files",
+    "uploads",
+    "backups",
+    "logs",
+    "production secrets",
+    "real applicant data",
+    "screenshots"
+  ]
+}

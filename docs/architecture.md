@@ -33,7 +33,7 @@ Caseworker, reviewer, and administrator workflows share a reviewed canonical pro
 
 ### Document processing
 
-`src/lib/document-processing` exposes a provider interface. The mock provider is the supported default. Optional server-side adapters exist for Anthropic, Gemini, Groq, OpenRouter, SambaNova, Cerebras, and Mistral. Proposed fields require staff review before they become reusable evidence.
+`src/lib/document-processing` exposes a provider interface. The mock provider is the supported default, and the only live adapter is self-hosted Ollama on localhost for explicitly synthetic evaluation payloads. Customer-sensitive documents are fail-closed before any provider call. Proposed fields require staff review before they become reusable evidence.
 
 ### PDFs and application templates
 

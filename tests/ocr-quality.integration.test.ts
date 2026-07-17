@@ -22,7 +22,7 @@ describe.skipIf(!enabled)("OCR/document extraction quality gate", () => {
     let expectedValues = 0; let matchedValues = 0; let sourcedValues = 0;
     const results = [];
     for (const item of corpus) {
-      const result = await processor.processDocument({ filename: item.file, mimeType: "application/pdf", bytes: await fs.readFile(`fixtures/${item.file}`), category: item.category });
+      const result = await processor.processDocument({ filename: item.file, mimeType: "application/pdf", bytes: await fs.readFile(`fixtures/${item.file}`), category: item.category, dataClass: "SYNTHETIC" });
       const fields = new Map(result.fields.map((field) => [field.name, field]));
       for (const [name, value] of Object.entries(item.expected)) {
         expectedValues += 1;
@@ -30,13 +30,13 @@ describe.skipIf(!enabled)("OCR/document extraction quality gate", () => {
         if (field && normalized(field.value) === normalized(value)) matchedValues += 1;
         if (field?.sourcePage && field.sourceText) sourcedValues += 1;
       }
-      results.push({ file: item.file, expected: Object.keys(item.expected).length, returned: result.fields.length, warnings: result.warnings.length });
+      results.push({ file: item.file, expected: Object.keys(item.expected).length, returned: result.fields.length, warnings: result.warnings.length, fields: result.fields });
     }
     const exactRecall = matchedValues / expectedValues;
     const sourceCoverage = sourcedValues / expectedValues;
-    expect(exactRecall).toBeGreaterThanOrEqual(0.8);
-    expect(sourceCoverage).toBe(1);
     await mkdir("output/evaluations", { recursive: true });
     await writeFile(`output/evaluations/ocr-${env.DOCUMENT_PROCESSOR}.json`, JSON.stringify({ syntheticOnly: true, provider: env.DOCUMENT_PROCESSOR, expectedValues, matchedValues, exactRecall, sourceCoverage, deliberateConflict: "1990-05-08 vs 1990-05-09", results }, null, 2));
+    expect(exactRecall).toBeGreaterThanOrEqual(0.8);
+    expect(sourceCoverage).toBe(1);
   }, 240_000);
 });

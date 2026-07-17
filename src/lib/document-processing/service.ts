@@ -9,7 +9,7 @@ export async function processStoredDocument(documentId: string, userId: string) 
   if (document.quarantineStatus !== "CLEAR" || document.deletedAt) throw new Error("Quarantined or deleted documents cannot be processed.");
   try {
     const bytes = await getLegacyOrStoredObject(document);
-    const result = processingResultSchema.parse(await getDocumentProcessor().processDocument({ filename: document.originalFilename, mimeType: document.fileType, bytes, category: document.documentCategory }));
+    const result = processingResultSchema.parse(await getDocumentProcessor().processDocument({ filename: document.originalFilename, mimeType: document.fileType, bytes, category: document.documentCategory, dataClass: "CUSTOMER_SENSITIVE" }));
     await db.$transaction(async (tx) => {
       await tx.extractedField.deleteMany({ where: { uploadedDocumentId: document.id } });
       await tx.uploadedDocument.update({ where: { id: document.id }, data: { documentCategory: result.category, processingStatus: "COMPLETED", processingError: null, expirationDate: result.expirationDate ? new Date(`${result.expirationDate}T12:00:00Z`) : null, extractedFields: { create: result.fields.map((field) => ({ fieldName: field.name, extractedValue: field.value, normalizedValue: field.value.normalize("NFKC").trim(), confidence: field.confidence, sourcePage: field.sourcePage, sourceText: field.sourceText, modelOutputDigest: sha256(JSON.stringify({ name: field.name, value: field.value, confidence: field.confidence, sourcePage: field.sourcePage, sourceText: field.sourceText })) })) } } });

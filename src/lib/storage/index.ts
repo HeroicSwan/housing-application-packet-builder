@@ -18,6 +18,7 @@ export type StorageConfig = {
   endpoint?: string;
   accessKeyId?: string;
   secretAccessKey?: string;
+  serverSideEncryption?: boolean;
 };
 
 function safeKey(key: string) {
@@ -57,7 +58,7 @@ function s3(config: StorageConfig) {
 }
 
 export function runtimeStorageConfig(): StorageConfig {
-  return { provider: env.STORAGE_PROVIDER, localRoot: env.LOCAL_STORAGE_ROOT, bucket: env.S3_BUCKET, region: env.S3_REGION, endpoint: env.S3_ENDPOINT, accessKeyId: env.S3_ACCESS_KEY_ID, secretAccessKey: env.S3_SECRET_ACCESS_KEY };
+  return { provider: env.STORAGE_PROVIDER, localRoot: env.LOCAL_STORAGE_ROOT, bucket: env.S3_BUCKET, region: env.S3_REGION, endpoint: env.S3_ENDPOINT, accessKeyId: env.S3_ACCESS_KEY_ID, secretAccessKey: env.S3_SECRET_ACCESS_KEY, serverSideEncryption: env.S3_SERVER_SIDE_ENCRYPTION };
 }
 
 async function activeStorageConfig(): Promise<StorageConfig> {
@@ -73,6 +74,7 @@ async function activeStorageConfig(): Promise<StorageConfig> {
     endpoint: typeof config.endpoint === "string" ? config.endpoint : undefined,
     accessKeyId: typeof config.accessKeyId === "string" ? config.accessKeyId : undefined,
     secretAccessKey: typeof secrets.secretAccessKey === "string" ? secrets.secretAccessKey : undefined,
+    serverSideEncryption: config.serverSideEncryption !== false,
   };
 }
 
@@ -84,7 +86,7 @@ export function createStorage(config: StorageConfig) {
       const normalized = safeKey(key);
       const encrypted = encryptBytes(bytes);
       if (client) {
-        await client.send(new PutObjectCommand({ Bucket: config.bucket, Key: normalized, Body: encrypted, ContentType: "application/octet-stream", ServerSideEncryption: "AES256", Metadata: { originalContentType: contentType, encrypted: "aes-256-gcm" } }), { abortSignal: signal });
+        await client.send(new PutObjectCommand({ Bucket: config.bucket, Key: normalized, Body: encrypted, ContentType: "application/octet-stream", ...(config.serverSideEncryption ? { ServerSideEncryption: "AES256" } : {}), Metadata: { originalContentType: contentType, encrypted: "aes-256-gcm" } }), { abortSignal: signal });
         return { key: normalized, provider: "S3", checksum: sha256(bytes), size: bytes.length };
       }
       const destination = localPath(normalized, config.localRoot);

@@ -1,9 +1,18 @@
 # AI vendor review
 
-Reviewed July 14, 2026. This is an engineering due-diligence record, not legal approval. Production configuration rejects any external processor that is not named in `APPROVED_AI_PROVIDERS`; an organization must document its own contract, DPA, region, subprocessors, incident terms, and lawful basis before adding a provider.
+## Current enforcement decision (2026-07-16)
+
+Applicant documents are classified as `CUSTOMER_SENSITIVE` at the storage-processing boundary. The application blocks every external AI processor for that class and production configuration requires `DOCUMENT_PROCESSOR=disabled`. This is a deliberate fail-closed control: caseworkers use manual review for real applicant documents. Provider probes and direct adapter tests may use synthetic payloads only.
+
+The default local model is Ollama `qwen2.5vl:7b`, a 7B vision-language model suitable for text and image fixtures. The host must keep the Ollama service, model files, logs, and backups access-controlled.
+
+The runtime catalog contains only self-hosted Ollama on a localhost endpoint for synthetic evaluation. Every cloud provider and arbitrary gateway is retired from runtime selection. Existing cloud credentials and legacy environment variables should be removed from deployments.
+
+Reviewed July 16, 2026. This is an engineering due-diligence record, not legal approval. The listed providers are synthetic-evaluation options only; production customer-data configuration rejects every external processor. An organization must document its own contract, DPA, region, subprocessors, incident terms, and lawful basis before using synthetic evaluation.
 
 | Provider | Observed official position | Engineering disposition for applicant documents |
 | --- | --- | --- |
+| Ollama (self-hosted) | Processing occurs on operator-controlled infrastructure. | Synthetic evaluation only in this application; the operator remains responsible for host logs, backups, and access controls. |
 | Google Gemini API | Unpaid services may use inputs/outputs for product improvement and human review. Paid API content is not used for product improvement, but prompts and responses are logged for abuse monitoring; Google states a 55-day period. | Block by default. Consider only paid service after DPA, transfer/region, 55-day retention, and sensitive-data review. Never use unpaid quota for applicant data. |
 | GroqCloud | Inference content is not retained by default except temporary reliability/abuse logs for up to 30 days. Organization controls can enable zero data retention; usage metadata remains. | Conditional. Require organization-wide ZDR, persistence features disabled, DPA/security review, U.S. processing approval, and a dedicated key. |
 | OpenRouter | OpenRouter prompt logging/training opt-ins are off by default and per-request ZDR routing is available, but requests are also governed by the selected downstream model provider. Metadata remains. | Conditional. The adapter sends `provider.zdr=true`; also require account guardrails, fixed provider/model allowlists, logging disabled, downstream-provider review, DPA, and a dedicated key. |
@@ -11,13 +20,13 @@ Reviewed July 14, 2026. This is an engineering due-diligence record, not legal a
 | Cerebras Inference | Official support states prompt content, requests/responses, chat/transaction logs, and model inputs/outputs are not retained; organization/account data and usage metrics remain. Terms say service content is not used for model training. | Conditional. Require DPA/security and region/subprocessor validation, contractual confirmation of the support-page statement, incident terms, and a dedicated key. |
 | Mistral API | Default API handling may retain input/output for 30 rolling days for abuse monitoring. Training and privacy controls exist; ZDR is available only on eligible Scale plans/stateless calls, and Labs models can be used for training regardless of opt-out. | Block by default. Consider only eligible paid stateless API with ZDR and training disabled, Labs disabled, DPA/region/subprocessor review, and a dedicated key. |
 
-## Expanded provider catalog (v1.0.0-rc.2)
+## Retired provider catalog
 
-The runtime additionally supports OpenAI, Azure OpenAI, xAI, DeepSeek, Together AI, Fireworks AI, Cohere, Perplexity, self-hosted Ollama, and operator-defined custom OpenAI-compatible endpoints. **No official-policy review has been performed for these vendors in this repository.** Their disposition is *Block by default*: production selection still requires the deploying organization to complete its own vendor review, list the provider in `APPROVED_AI_PROVIDERS`, and record `AI_PROVIDER_APPROVAL_ID` as described below. Self-hosted Ollama and custom gateways shift the retention question onto the operator's own infrastructure, which the same approval record must cover.
+Gemini, Mistral, SambaNova, Groq, OpenRouter, xAI, DeepSeek, Together AI, Fireworks AI, Cohere, Perplexity, and arbitrary custom OpenAI-compatible endpoints are not selectable at runtime. They are retained only in this historical review for audit context. Legacy environment variables should be removed from deployments.
 
 ## Required approval record
 
-For each approved provider, record the legal entity, product/tier, model IDs, endpoint/region, DPA date, retention and deletion behavior, training setting, human-access conditions, subprocessors, transfer mechanism, breach-notification term, key owner, spend limit, approval owner, approval date, and next review date. Re-review on provider, model, endpoint, or terms changes and at least annually.
+For each synthetic-evaluation provider, record the legal entity, product/tier, model IDs, endpoint/region, DPA date, retention and deletion behavior, training setting, human-access conditions, subprocessors, transfer mechanism, breach-notification term, key owner, spend limit, approval owner, approval date, and next review date. Re-review on provider, model, endpoint, or terms changes and at least annually.
 
 ## Sources
 

@@ -56,14 +56,14 @@ export const storageSetupSchema = z.object({
 export const malwareSetupSchema = z.object({ scanner: z.enum(["none", "clamav"]), host: text(1, 253), port: z.number().int().min(1).max(65535) });
 
 export const aiSetupSchema = z.object({
-  provider: z.enum(["disabled", "anthropic", "gemini", "groq", "openrouter", "sambanova", "cerebras", "mistral", "openai", "azure-openai", "xai", "deepseek", "together", "fireworks", "cohere", "perplexity", "ollama", "custom"]),
+  provider: z.enum(["disabled", "ollama"]),
   model: optionalText(200),
-  approvalId: optionalText(200),
+  baseUrl: optionalText(2048),
   providerRetentionAcknowledged: z.boolean(),
   dataProcessingAgreementAcknowledged: z.boolean(),
 }).superRefine((value, context) => {
   if (value.provider !== "disabled" && !value.model) context.addIssue({ code: "custom", path: ["model"], message: "Select the exact approved model." });
-  if (value.provider !== "disabled" && !value.approvalId) context.addIssue({ code: "custom", path: ["approvalId"], message: "Record the organization approval reference." });
+  if (value.provider === "ollama" && (!value.baseUrl || !/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(value.baseUrl))) context.addIssue({ code: "custom", path: ["baseUrl"], message: "Ollama must use a localhost URL." });
   if (value.provider !== "disabled" && !value.providerRetentionAcknowledged) context.addIssue({ code: "custom", path: ["providerRetentionAcknowledged"], message: "Review and acknowledge the provider retention setting." });
 });
 

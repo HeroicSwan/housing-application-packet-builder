@@ -51,7 +51,7 @@ function parseStepSections(step: SetupStepId, formData: FormData): SectionSave[]
     ];
   }
   if (step === "ai") {
-    const ai = aiSetupSchema.parse({ provider: stringField(formData, "provider"), model: stringField(formData, "model"), approvalId: stringField(formData, "approvalId"), providerRetentionAcknowledged: booleanField(formData, "providerRetentionAcknowledged"), dataProcessingAgreementAcknowledged: booleanField(formData, "dataProcessingAgreementAcknowledged") });
+    const ai = aiSetupSchema.parse({ provider: stringField(formData, "provider"), model: stringField(formData, "model"), baseUrl: stringField(formData, "baseUrl"), providerRetentionAcknowledged: booleanField(formData, "providerRetentionAcknowledged"), dataProcessingAgreementAcknowledged: booleanField(formData, "dataProcessingAgreementAcknowledged") });
     return [{ section: "ai", configuration: ai, secretReplacement: stringField(formData, "apiKey") ? { apiKey: stringField(formData, "apiKey") } : undefined }];
   }
   if (step === "operations") {

@@ -26,7 +26,7 @@ try {
   const encrypted = encryptBackup(plain, kind);
   if (process.env.STORAGE_PROVIDER === "s3") {
     const client = new S3Client({ region: process.env.S3_REGION ?? "us-east-1", endpoint: process.env.S3_ENDPOINT, forcePathStyle: Boolean(process.env.S3_ENDPOINT), credentials: process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY ? { accessKeyId: process.env.S3_ACCESS_KEY_ID, secretAccessKey: process.env.S3_SECRET_ACCESS_KEY } : undefined });
-    await client.send(new PutObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key, Body: encrypted.bytes, ServerSideEncryption: "AES256", Metadata: { checksum: encrypted.checksum, database: kind } }));
+    await client.send(new PutObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key, Body: encrypted.bytes, ...(process.env.S3_SERVER_SIDE_ENCRYPTION !== "false" ? { ServerSideEncryption: "AES256" } : {}), Metadata: { checksum: encrypted.checksum, database: kind } }));
   } else {
     const destination = path.resolve(process.env.LOCAL_STORAGE_ROOT ?? ".data/storage", key);
     await fs.mkdir(path.dirname(destination), { recursive: true });

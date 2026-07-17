@@ -18,7 +18,7 @@ Status reviewed July 15, 2026. Repository-controlled release engineering is comp
 
 ## Current verification
 
-- Unit/integration: 35 files passed, 5 service-gated files skipped; 246 tests passed, 5 skipped.
+- Unit/integration: 36 files passed, 5 service-gated files skipped; 204 tests passed, 5 skipped.
 - Browser E2E: 11 passed across caseworker, reviewer, administrator, setup, application automation, downloads, axe checks, health, metrics, and authorization denial.
 - TypeScript: passed.
 - ESLint: passed.
@@ -30,7 +30,7 @@ Status reviewed July 15, 2026. Repository-controlled release engineering is comp
 - Worker acceptance: queued retention work processed.
 - YAML parsing: production compose and all seven GitHub workflows parsed successfully.
 
-Service-gated checks are enumerated by `npm run validate:live`: ClamAV, OCR quality, provider smoke tests, PostgreSQL RLS, production worker, backup restore, deployment health, caseworker sessions, manual accessibility, and external reviews. The synthetic 120-applicant evaluation now runs in the safe validator; live checks must run in the approved target environment.
+Service-gated checks are enumerated by `npm run validate:live`: ClamAV, OCR quality, provider smoke tests, PostgreSQL RLS, production worker, backup restore, deployment health, caseworker sessions, manual accessibility, and external reviews. Local Ollama smoke and the synthetic OCR corpus pass; the remaining service gates must run in the approved target environment.
 
 ## External launch gates
 

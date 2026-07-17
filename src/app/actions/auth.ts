@@ -15,6 +15,12 @@ import { decryptText, encryptText, sha256 } from "@/lib/security/encryption";
 import { z } from "zod";
 
 const mfaCookie = "hapb_mfa_challenge";
+let dummyPasswordHashPromise: Promise<string> | undefined;
+
+function dummyPasswordHash() {
+  dummyPasswordHashPromise ??= bcrypt.hash(crypto.randomBytes(32).toString("base64url"), 12);
+  return dummyPasswordHashPromise;
+}
 
 export async function loginAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -22,7 +28,7 @@ export async function loginAction(formData: FormData) {
   if (!(await checkRateLimit(`login:${email || "anonymous"}`))) redirect("/?error=Too+many+attempts.+Try+again+in+one+minute.");
   const user = await db.user.findUnique({ where: { email }, include: { organization: { select: { requireMfa: true } } } });
   if (user?.lockedUntil && user.lockedUntil > new Date()) redirect("/?error=This+account+is+temporarily+locked.+Try+again+later.");
-  const valid = user ? await bcrypt.compare(password, user.passwordHash) : await bcrypt.compare(password, "$2b$12$vXPtMh8MB5GqHhiZ2foRPea9eTxM0wTjG4HHB8L5e6VTL7v6m7R2q");
+  const valid = user ? await bcrypt.compare(password, user.passwordHash) : await bcrypt.compare(password, await dummyPasswordHash());
   if (!user || !user.isActive || !valid) {
     if (user) {
       const updated = await db.user.update({ where: { id: user.id }, data: { failedLoginCount: { increment: 1 } }, select: { failedLoginCount: true } });

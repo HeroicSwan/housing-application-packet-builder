@@ -13,16 +13,8 @@ const playwrightCli = path.join(repositoryRoot, "node_modules", "@playwright", "
 const schemaPath = path.join(repositoryRoot, "prisma", "schema.prisma");
 const storagePath = path.join(repositoryRoot, ".data", "e2e", runId);
 const distPath = path.join(repositoryRoot, ".next-e2e");
-const providerKeyNames = [
-  "ANTHROPIC_API_KEY",
-  "GEMINI_API_KEY",
-  "GROQ_API_KEY",
-  "OPENROUTER_API_KEY",
-  "SAMBANOVA_API_KEY",
-  "CEREBRAS_API_KEY",
-  "MISTRAL_API_KEY",
-];
-
+const monitoringToken = randomBytes(48).toString("base64url");
+const sessionSecret = randomBytes(48).toString("base64url");
 const childEnvironment = {
   ...process.env,
   APP_URL: "http://127.0.0.1:3100",
@@ -38,21 +30,18 @@ const childEnvironment = {
   ENFORCE_PRODUCTION_CONFIG: "false",
   LOCAL_STORAGE_ROOT: path.relative(repositoryRoot, storagePath),
   MALWARE_SCANNER: "none",
-  MONITORING_TOKEN: "synthetic-e2e-monitoring-token-with-32-characters",
-  OPENROUTER_HTTP_REFERER: "",
+  MONITORING_TOKEN: monitoringToken,
   S3_ACCESS_KEY_ID: "",
   S3_BUCKET: "",
   S3_ENDPOINT: "",
   S3_SECRET_ACCESS_KEY: "",
-  SESSION_SECRET: "synthetic-e2e-session-secret-with-at-least-32-characters",
+  SESSION_SECRET: sessionSecret,
   SMTP_HOST: "",
   SMTP_PASSWORD: "",
   SMTP_USER: "",
   STORAGE_PROVIDER: "local",
   SYNTHETIC_SEED_CONTEXT: "e2e",
 };
-for (const key of providerKeyNames) childEnvironment[key] = "";
-
 let activeChild;
 
 function runNodeScript(scriptPath, args, label) {

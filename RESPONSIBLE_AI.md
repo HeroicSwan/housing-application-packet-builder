@@ -4,7 +4,7 @@ Document processing is assistive transcription, not an authority. Phase 0 permit
 
 ## Current behavior
 
-The default mock processor is deterministic and requires no provider account. Optional server-side adapters can send synthetic PDFs or images to configured Anthropic, Gemini, Groq, OpenRouter, SambaNova, Cerebras, or Mistral services. Provider output is schema-validated and begins as a proposal that staff can approve, correct, or reject.
+The default mock processor is deterministic and requires no provider account. The only supported live adapter is self-hosted Ollama on a localhost endpoint, and it is permitted only for explicitly synthetic evaluation payloads. Provider output is schema-validated and begins as a proposal that staff can approve, correct, or reject. Customer-sensitive documents are blocked from every AI adapter.
 
 Reviewed human values are not silently replaced by later provider output. Deterministic application and requirement rules remain separate from AI proposals.
 

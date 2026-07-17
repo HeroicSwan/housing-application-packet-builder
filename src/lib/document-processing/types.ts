@@ -14,7 +14,8 @@ export const processingResultSchema = z.object({
 });
 
 export type DocumentProcessingResult = z.infer<typeof processingResultSchema>;
-export type DocumentProcessingInput = { filename: string; mimeType: string; bytes: Uint8Array; category?: string };
+export type DocumentDataClass = "SYNTHETIC" | "CUSTOMER_SENSITIVE";
+export type DocumentProcessingInput = { filename: string; mimeType: string; bytes: Uint8Array; category?: string; dataClass?: DocumentDataClass };
 
 export interface DocumentProcessor {
   processDocument(input: DocumentProcessingInput): Promise<DocumentProcessingResult>;

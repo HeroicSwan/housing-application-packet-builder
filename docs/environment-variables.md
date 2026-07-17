@@ -78,31 +78,11 @@ Only `PASSED` satisfies a required production connection test. Synthetic mode ma
 
 | Variable | Purpose | Production rule |
 | --- | --- | --- |
-| `DOCUMENT_PROCESSOR` | `disabled`, `mock`, or one configured provider | Mock is rejected; external providers need approval and a key |
-| `APPROVED_AI_PROVIDERS` | Comma-separated organization-approved provider IDs | Selected external provider must be listed |
-| `AI_PROVIDER_APPROVAL_ID` | Links the selection to an organization-owned approval record | Required for an external production processor |
+| `DOCUMENT_PROCESSOR` | `disabled`, `mock`, or `ollama` | Production must be `disabled`; only local Ollama is supported |
 | `DOCUMENT_PROCESSOR_TIMEOUT_MS` | Provider request timeout | 5,000–120,000 milliseconds |
-| `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | Anthropic credential and model ID | Key required only when selected |
-| `GEMINI_API_KEY` / `GEMINI_MODEL` | Gemini credential and model ID | Key required only when selected |
-| `GROQ_API_KEY` / `GROQ_MODEL` | Groq credential and model ID | Key required only when selected |
-| `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` | OpenRouter credential and model ID | Key required only when selected |
-| `OPENROUTER_HTTP_REFERER` | Optional valid referer URL sent to OpenRouter | Review disclosure before use |
-| `OPENROUTER_APP_TITLE` | Optional application title sent to OpenRouter | Must not contain applicant information |
-| `SAMBANOVA_API_KEY` / `SAMBANOVA_MODEL` | SambaNova credential and model ID | Key required only when selected |
-| `CEREBRAS_API_KEY` / `CEREBRAS_MODEL` | Cerebras credential and model ID | Key required only when selected |
-| `MISTRAL_API_KEY` / `MISTRAL_MODEL` | Mistral credential and model ID | Key required only when selected |
-| `OPENAI_API_KEY` / `OPENAI_MODEL` | OpenAI credential and model ID | Key required only when selected |
-| `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_DEPLOYMENT` / `AZURE_OPENAI_API_VERSION` | Azure OpenAI credential, resource endpoint, deployment name, API version | Key, HTTPS endpoint, and deployment required when selected |
-| `XAI_API_KEY` / `XAI_MODEL` | xAI credential and model ID | Key required only when selected |
-| `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL` | DeepSeek credential and model ID | Key required only when selected; text-only models cannot read scans |
-| `TOGETHER_API_KEY` / `TOGETHER_MODEL` | Together AI credential and model ID | Key required only when selected |
-| `FIREWORKS_API_KEY` / `FIREWORKS_MODEL` | Fireworks AI credential and model ID | Key required only when selected |
-| `COHERE_API_KEY` / `COHERE_MODEL` | Cohere credential and model ID (compatibility API) | Key required only when selected |
-| `PERPLEXITY_API_KEY` / `PERPLEXITY_MODEL` | Perplexity credential and model ID | Key required only when selected |
-| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` / `OLLAMA_API_KEY` | Self-hosted Ollama endpoint, model, optional key | HTTPS required in production |
-| `CUSTOM_OPENAI_BASE_URL` / `CUSTOM_OPENAI_MODEL` / `CUSTOM_OPENAI_API_KEY` / `CUSTOM_OPENAI_PROVIDER_NAME` | Any other OpenAI-compatible endpoint (gateway, vLLM, LiteLLM, unlisted vendor) | Base URL and model required when selected; HTTPS required in production |
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` / `OLLAMA_API_KEY` | Local Ollama endpoint, model, optional local auth key | Endpoint must be localhost |
 
-Credential material is validated only for the selected provider, so unrelated provider variables that happen to exist on a machine never block startup. Production should use `DOCUMENT_PROCESSOR=disabled` until an administrator has approved the exact provider, model, account tier, retention behavior, region, contract/DPA, and data categories. Provider configuration never bypasses human review.
+No cloud credentials are accepted. Production must use `DOCUMENT_PROCESSOR=disabled`; synthetic evaluation may use only a localhost Ollama endpoint. Provider configuration never bypasses human review.
 
 ## Upload and malware controls
 
@@ -123,6 +103,7 @@ Credential material is validated only for the selected provider, so unrelated pr
 | `S3_ENDPOINT` | Optional S3-compatible endpoint | HTTPS required when set |
 | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | Object-storage credentials | Set both, or neither when using an approved workload identity; keep credentials in a secret manager |
 | `S3_PRIVATE_BUCKET_ACKNOWLEDGEMENT` | Records confirmation that the bucket is private | Must equal `I_CONFIRMED_THE_PRODUCTION_BUCKET_IS_PRIVATE` |
+| `S3_SERVER_SIDE_ENCRYPTION` | Requests SSE-S3 in addition to the application's authenticated encryption envelope | Must remain `true` in production; local MinIO tests may disable it only when client-side encryption remains enabled |
 | `DATA_ENCRYPTION_KEY` | Current authenticated-encryption key | Required canonical Base64 for exactly 32 random bytes |
 | `DATA_ENCRYPTION_KEY_ID` | Non-secret identifier stored with encrypted envelopes | Required unique rotation identifier; local/development/default identifiers are rejected |
 | `DATA_ENCRYPTION_PREVIOUS_KEYS` | JSON key-ID map used temporarily during rotation | Secret; remove after verified re-encryption |

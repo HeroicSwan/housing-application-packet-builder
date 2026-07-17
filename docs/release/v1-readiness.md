@@ -35,16 +35,16 @@ Status reviewed July 15, 2026. This checklist tracks the attached nonprofit-read
 
 ## Baseline evidence
 
-- Unit/integration: 35 files passed, 5 service-gated files skipped; 246 tests passed and 5 skipped.
+- Unit/integration: 36 files passed, 5 service-gated files skipped; 204 tests passed and 5 skipped.
 - Browser E2E and automated accessibility: 11 passed.
 - TypeScript, ESLint, production build, dependency audit, current-tree secret scan, production schema validation, and synthetic eight-field AcroForm acceptance: passed.
 - Encrypted SQLite backup creation, verification, and disposable restore: passed using a generated synthetic test key.
-- Live ClamAV, live OCR/provider quality, live provider smoke, historical Groq replay, and PostgreSQL RLS remain explicitly service-gated.
+- Local Ollama smoke and synthetic OCR quality now pass; live ClamAV, PostgreSQL RLS, production worker, backup/restore, deployment health, human-review, and organizational gates remain explicitly service-gated.
 
 | Command | Result | Measured duration or count |
 | --- | --- | --- |
-| `npm run validate` | Passed | Production schema, current/history secret scans, lint, typecheck, 246 unit/integration tests, 120-applicant evaluation, production build, 11 browser/axe tests, and dependency audit. |
-| `npm test` | Passed | 35 files passed, 5 skipped; 246 tests passed, 5 skipped. |
+| `npm run validate` | Passed | Production schema, current/history secret scans, lint, typecheck, 204 unit/integration tests, 120-applicant evaluation, production build, 11 browser/axe tests, and dependency audit. |
+| `npm test` | Passed | 36 files passed, 5 skipped; 204 tests passed, 5 skipped. |
 | `npm run test:e2e` | Passed | 11 Chromium tests including axe checks. |
 | `npm run lint` | Passed | No errors or warnings. |
 | `npm run typecheck` | Passed | No type errors. |

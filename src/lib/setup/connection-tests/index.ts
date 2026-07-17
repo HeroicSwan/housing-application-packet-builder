@@ -62,7 +62,7 @@ async function execute(kind: SetupConnectionTest, sections: Map<string, { config
   }
   if (kind === "ai") {
     const record = section("ai"); const config = safeSetupConfiguration(record?.configurationJson ?? "{}"); const secret = secrets(record?.secretEncrypted); const started = performance.now();
-    const result = await probeAiProvider({ provider: String(config.provider ?? "disabled") as never, model: typeof config.model === "string" ? config.model : undefined, apiKey: typeof secret.apiKey === "string" ? secret.apiKey : undefined, httpReferer: env.OPENROUTER_HTTP_REFERER, appTitle: env.OPENROUTER_APP_TITLE });
+    const result = await probeAiProvider({ provider: String(config.provider ?? "disabled") as never, model: typeof config.model === "string" ? config.model : undefined, apiKey: typeof secret.apiKey === "string" ? secret.apiKey : undefined, baseUrl: typeof config.baseUrl === "string" ? config.baseUrl : undefined });
     return { status: result.status, code: result.code, summary: result.status === "PASSED" ? "The exact approved model was found and completed one minimal synthetic request." : result.status === "UNSUPPORTED" ? "AI processing is intentionally disabled; no applicant data will leave for an AI provider." : "The provider or exact model could not be verified with the saved settings.", durationMs: Math.round(performance.now() - started) };
   }
   if (kind === "database") return testDatabasePermissions();
