@@ -31,7 +31,28 @@ npm run setup
 npm run dev
 ```
 
-Open `http://localhost:3000`. Use synthetic fixtures only. Production operators should follow [`docs/synthetic-deployment.md`](../../docs/synthetic-deployment.md), [`docs/production-operations.md`](../../docs/production-operations.md), and [`docs/release/secret-manager-runbook.md`](../../docs/release/secret-manager-runbook.md).
+Open `http://localhost:3000`. Use synthetic fixtures only. Production operators should follow [`docs/synthetic-deployment.md`](docs/synthetic-deployment.md), [`docs/production-operations.md`](docs/production-operations.md), and [`docs/release/secret-manager-runbook.md`](docs/release/secret-manager-runbook.md).
+
+### Optional local AI setup
+
+The exact supported model is `qwen2.5vl:7b`. Install Ollama from [ollama.com/download](https://ollama.com/download), then run:
+
+```text
+ollama pull qwen2.5vl:7b
+ollama list
+```
+
+After `npm run setup`, set these values in `.env` and restart the app:
+
+```dotenv
+DOCUMENT_PROCESSOR=ollama
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=qwen2.5vl:7b
+OLLAMA_API_KEY=
+DOCUMENT_PROCESSOR_TIMEOUT_MS=120000
+```
+
+Keep Ollama running locally (`ollama serve` when the desktop app is not already running), verify it with `ollama run qwen2.5vl:7b "Reply with exactly: OLLAMA_READY"`, and then run `npm run evaluate`. Full prerequisites, Windows/macOS/Linux installation, network boundaries, and production approval requirements are in [`LOCAL_OLLAMA.md`](LOCAL_OLLAMA.md).
 
 ## Upgrade and rollback
 

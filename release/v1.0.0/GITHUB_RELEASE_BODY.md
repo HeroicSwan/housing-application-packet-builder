@@ -28,6 +28,38 @@ npm run dev
 
 Open `http://localhost:3000`. Use synthetic data while evaluating the product. Do not upload real applicant information until the deployment has approved retention, access, encryption, backup, and incident-response procedures.
 
+### Local Ollama setup (optional AI extraction)
+
+The exact supported model is `qwen2.5vl:7b` (Qwen2.5-VL 7B). Install Ollama from [ollama.com/download](https://ollama.com/download), then download the model:
+
+```bash
+ollama --version
+ollama pull qwen2.5vl:7b
+ollama list
+```
+
+On Linux, the official installer is `curl -fsSL https://ollama.com/install.sh | sh`. On Windows and macOS, install the official desktop app and open a new terminal. Keep the app running, or start the service with `ollama serve`.
+
+After `npm run setup`, edit `.env` and restart the app with this exact local configuration:
+
+```dotenv
+DOCUMENT_PROCESSOR=ollama
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=qwen2.5vl:7b
+OLLAMA_API_KEY=
+DOCUMENT_PROCESSOR_TIMEOUT_MS=120000
+```
+
+Verify the model before using the app:
+
+```bash
+ollama run qwen2.5vl:7b "Reply with exactly: OLLAMA_READY"
+npm run healthcheck
+npm run evaluate
+```
+
+The model must remain on loopback and Ollama's API must not be exposed to the public internet. The application keeps human review mandatory for every extracted value. For the complete Windows/macOS/Linux setup, hardware notes, troubleshooting, and production approval boundary, read [`docs/local-ollama.md`](https://github.com/HeroicSwan/housing-application-packet-builder/blob/master/docs/local-ollama.md).
+
 ### Verification completed for this release
 
 - 205 unit and integration tests passed (5 intentionally skipped where live infrastructure is required).
