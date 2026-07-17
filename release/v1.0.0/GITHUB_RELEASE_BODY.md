@@ -20,13 +20,23 @@ The application is designed to pair with PostgreSQL row-level security, private 
 
 ### Quick start
 
-```bash
-npm ci
-npm run setup
-npm run dev
-```
+This is the complete path from a blank Windows, macOS, or Linux PC. Docker is not required.
 
-Open `http://localhost:3000`. Use synthetic data while evaluating the product. Do not upload real applicant information until the deployment has approved retention, access, encryption, backup, and incident-response procedures.
+1. Install [Git](https://git-scm.com/downloads), [Node.js 22+](https://nodejs.org/), and optionally [Ollama](https://ollama.com/download). Install Chromium only for browser tests.
+2. Open a new terminal and verify `git --version`, `node --version`, and `npm --version`.
+3. Clone and bootstrap the app:
+
+   ```bash
+   git clone https://github.com/HeroicSwan/housing-application-packet-builder.git
+   cd housing-application-packet-builder
+   npm ci
+   npm run setup
+   npm run dev
+   ```
+
+4. Open `http://localhost:3000`. The synthetic demo accounts are `caseworker@example.org`, `reviewer@example.org`, and `admin@example.org`; the public demo password is `DemoHousing2026!`.
+
+`npm run setup` creates the disposable SQLite database, local-only secrets, synthetic storage, Prisma client, demo records, and health probes. It does not overwrite an existing `.env` or database.
 
 ### Local Ollama setup (optional AI extraction)
 
@@ -60,6 +70,22 @@ npm run evaluate
 
 The model must remain on loopback and Ollama's API must not be exposed to the public internet. The application keeps human review mandatory for every extracted value. For the complete Windows/macOS/Linux setup, hardware notes, troubleshooting, and production approval boundary, read [`docs/local-ollama.md`](https://github.com/HeroicSwan/housing-application-packet-builder/blob/master/docs/local-ollama.md).
 
+### Test and evaluate
+
+Run the individual checks or the complete safe gate:
+
+```bash
+npm run healthcheck
+npm run lint
+npm run typecheck
+npm test
+npm run test:e2e
+npm run evaluate
+npm run validate
+```
+
+`npm run validate` covers schema validation, secret/history scans, tests, the 120-applicant synthetic evaluation, production build, browser/accessibility checks, and dependency audit.
+
 ### Verification completed for this release
 
 - 205 unit and integration tests passed (5 intentionally skipped where live infrastructure is required).
@@ -70,7 +96,7 @@ The model must remain on loopback and Ollama's API must not be exposed to the pu
 
 ### Production-readiness gates
 
-This is a stable software release, not a claim that every organization is production-ready on first install. Before handling real cases, each deploying organization still needs an approved agency PDF template, real service credentials, production PostgreSQL and object storage, worker supervision, TLS and monitoring, backup/restore evidence, credential rotation, and organizational approval. Independent penetration testing, manual accessibility review, moderated caseworker testing, privacy/legal review, and an AI-vendor review remain explicit release gates.
+This is a stable software release, not a claim that every organization is production-ready on first install. The software is functional and can be evaluated locally, but it has not received enough independent real-world testing to be recommended for live housing decisions. Do not use real applicant data, make eligibility decisions, or connect a live agency portal until the organization completes an approved agency PDF workflow, production PostgreSQL and object storage, worker supervision, TLS and monitoring, backup/restore evidence, credential rotation, penetration testing, manual accessibility and caseworker testing, privacy/legal review, retention policy, and organizational approval. Anyone running it before those gates does so at their own risk; synthetic data is the only supported default.
 
 ### Upgrade and support
 

@@ -22,16 +22,91 @@ This package is synthetic-data ready and locally validated. It is not an authori
 - Local OCR corpus: passed with full expected-value recall and source coverage.
 - Dependency audit: 0 high-severity vulnerabilities reported.
 
-## Install and run
+## Start from a blank PC
+
+This is the complete local setup for a Windows, macOS, or Linux computer. Docker is not required.
+
+### 1. Install prerequisites
+
+- Git, so the repository can be cloned.
+- Node.js 22 or newer (the installer includes npm; npm 10 or newer is recommended).
+- Chromium only if you want to run browser tests; the project can run without it.
+- Ollama only if you want local AI extraction. It is optional; the default mock processor is deterministic and needs no model download.
+
+Download Git from [git-scm.com/downloads](https://git-scm.com/downloads), Node.js from [nodejs.org](https://nodejs.org/), and Ollama from [ollama.com/download](https://ollama.com/download). Open a new terminal after installing and verify:
 
 ```text
+git --version
+node --version
+npm --version
+```
+
+### 2. Clone and install the project
+
+```text
+git clone https://github.com/HeroicSwan/housing-application-packet-builder.git
+cd housing-application-packet-builder
 npm ci
-copy .env.example .env
 npm run setup
+```
+
+`npm run setup` creates a disposable SQLite database, generates local-only secrets, prepares storage, generates Prisma, seeds synthetic demo accounts, and performs local health probes. It does not overwrite an existing `.env` or database.
+
+### 3. Optional: enable local AI extraction
+
+The exact supported model is `qwen2.5vl:7b`. Install Ollama, then run:
+
+```text
+ollama pull qwen2.5vl:7b
+ollama list
+```
+
+Keep Ollama running with the desktop app or `ollama serve`. After `npm run setup`, edit `.env` to contain:
+
+```dotenv
+DOCUMENT_PROCESSOR=ollama
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=qwen2.5vl:7b
+OLLAMA_API_KEY=
+DOCUMENT_PROCESSOR_TIMEOUT_MS=120000
+```
+
+Verify the model with `ollama run qwen2.5vl:7b "Reply with exactly: OLLAMA_READY"`. Full AI setup and troubleshooting are in [`docs/local-ollama.md`](docs/local-ollama.md).
+
+### 4. Start and use the application
+
+```text
 npm run dev
 ```
 
-Open `http://localhost:3000`. Use synthetic fixtures only. Production operators should follow [`docs/synthetic-deployment.md`](docs/synthetic-deployment.md), [`docs/production-operations.md`](docs/production-operations.md), and [`docs/release/secret-manager-runbook.md`](docs/release/secret-manager-runbook.md).
+Open [http://localhost:3000](http://localhost:3000). The synthetic demo accounts are:
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Caseworker | `caseworker@example.org` | `DemoHousing2026!` |
+| Reviewer | `reviewer@example.org` | `DemoHousing2026!` |
+| Administrator | `admin@example.org` | `DemoHousing2026!` |
+
+Use the caseworker flow to create a case, add household and income information, upload synthetic documents, review extracted values, generate a packet, and send it through the approval flow. Use the reviewer and administrator accounts to exercise correction, approval, template, role, and setup workflows. These credentials are public demo credentials and must never be enabled in production.
+
+### 5. Run tests and evaluation
+
+With the app stopped, run individual checks as needed:
+
+```text
+npm run healthcheck
+npm run lint
+npm run typecheck
+npm test
+npm run test:e2e
+npm run evaluate
+```
+
+`npm run validate` runs the complete safe gate: production schema validation, secret and history scans, lint, typecheck, unit/integration tests, the 120-applicant synthetic evaluation, production build, browser/accessibility tests, and dependency audit.
+
+### 6. Important risk statement
+
+The software is functional and can be evaluated locally, but it has not received enough independent real-world testing to be recommended for production housing decisions. Do not use real applicant data, make eligibility decisions, or connect a live agency portal until your organization completes infrastructure deployment, penetration testing, manual accessibility and caseworker testing, privacy/legal approval, retention policy, credential rotation, backups, monitoring, and an approved agency PDF workflow. Anyone running it before those gates does so at their own risk; synthetic data is the only supported default.
 
 ### Optional local AI setup
 
