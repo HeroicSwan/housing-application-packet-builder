@@ -73,6 +73,7 @@ model User {
   assignedCases             ClientCase[]               @relation("AssignedCaseworker")
   uploadedDocuments         UploadedDocument[]         @relation("UploadedBy")
   reviewedExtractions       ExtractedField[]           @relation("ExtractionReviewer")
+  extractedFieldRevisions   ExtractedFieldRevision[]   @relation("ExtractionRevisionReviewer")
   approvedPackets           ApplicationPacket[]        @relation("PacketApprover")
   packetFields              PacketField[]              @relation("FieldReviewer")
   reviewNotes               ReviewNote[]
@@ -662,8 +663,27 @@ model ExtractedField {
   sourceRegionJson   String?
   modelOutputDigest  String?
   reviewerRevision   Int              @default(0)
+  revisions          ExtractedFieldRevision[]
 
   @@index([uploadedDocumentId, reviewStatus])
+}
+
+model ExtractedFieldRevision {
+  id               String         @id @default(cuid())
+  extractedFieldId String
+  extractedField   ExtractedField @relation(fields: [extractedFieldId], references: [id], onDelete: Cascade)
+  reviewerId       String?
+  reviewer         User?          @relation("ExtractionRevisionReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  beforeValue      String?
+  afterValue       String?
+  beforeStatus     String
+  afterStatus      String
+  beforeReason     String?
+  afterReason      String?
+  sourceRevision   Int
+  createdAt        DateTime       @default(now())
+
+  @@index([extractedFieldId, createdAt])
 }
 
 model ApplicationPacket {

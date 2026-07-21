@@ -86,11 +86,53 @@ export async function reviewExtractionAction(clientCaseId: string, fieldId: stri
   if (input.status === "EDITED" && !input.reviewedValue) throw new Error("Enter the corrected value before saving an edit.");
   if (!["APPROVED", "EDITED"].includes(input.status) && input.reason.length < 3) throw new Error("Add a reason for this review state.");
   const field = await db.extractedField.findFirstOrThrow({ where: { id: fieldId, uploadedDocument: { clientCaseId, quarantineStatus: "CLEAR", deletedAt: null } } });
-  await db.$transaction([
-    db.extractedField.update({ where: { id: field.id }, data: { reviewStatus: input.status, validationState: validationStateByReview[input.status], reviewReason: input.reason || null, reviewedValue: input.status === "EDITED" ? input.reviewedValue : input.status === "APPROVED" ? input.reviewedValue || field.extractedValue : null, reviewerId: user.id, reviewedAt: new Date(), reviewerRevision: { increment: 1 } } }),
-    db.auditEvent.create({ data: { userId: user.id, clientCaseId, action: input.status === "EDITED" ? "EXTRACTION_EDITED" : `EXTRACTION_${input.status}`, entityType: "ExtractedField", entityId: field.id, metadata: "Extraction review completed; original, normalized, reviewed values, and reason not logged" } }),
-  ]);
+  const afterValue = input.status === "EDITED" ? input.reviewedValue : input.status === "APPROVED" ? input.reviewedValue || field.extractedValue : null;
+  await db.$transaction(async (tx) => {
+    const revision = field.reviewerRevision + 1;
+    await tx.extractedFieldRevision.create({ data: { extractedFieldId: field.id, reviewerId: user.id, beforeValue: field.reviewedValue ?? field.normalizedValue ?? field.extractedValue, afterValue, beforeStatus: field.reviewStatus, afterStatus: input.status, beforeReason: field.reviewReason, afterReason: input.reason || null, sourceRevision: revision } });
+    await tx.extractedField.update({ where: { id: field.id }, data: { reviewStatus: input.status, validationState: validationStateByReview[input.status], reviewReason: input.reason || null, reviewedValue: afterValue, reviewerId: user.id, reviewedAt: new Date(), reviewerRevision: revision } });
+    await tx.auditEvent.create({ data: { userId: user.id, clientCaseId, action: input.status === "EDITED" ? "EXTRACTION_EDITED" : `EXTRACTION_${input.status}`, entityType: "ExtractedField", entityId: field.id, metadata: `Extraction review revision ${revision} recorded; values remain restricted to the case review surface` } });
+  });
   await runWithOrganization(user.organizationId, () => invalidateCaseDrafts(clientCaseId, user.id, "Reviewed source-document information changed."));
+  activateOrganizationContext(user);
+  revalidatePath(`/cases/${clientCaseId}/documents`);
+  revalidatePath(`/cases/${clientCaseId}/requirements`);
+}
+
+export async function batchApproveHighConfidenceAction(clientCaseId: string, documentId: string, formData: FormData) {
+  const user = activateOrganizationContext(await requireRole(["CASEWORKER", "REVIEWER", "SUPERVISOR"]));
+  if (!(await canAccessCase(user, clientCaseId))) throw new Error("Case access denied.");
+  const threshold = z.coerce.number().min(0.75).max(1).default(0.9).parse(formData.get("threshold") ?? 0.9);
+  const document = await db.uploadedDocument.findFirstOrThrow({ where: { id: documentId, clientCaseId, quarantineStatus: "CLEAR", deletedAt: null }, include: { extractedFields: true } });
+  const eligible = document.extractedFields.filter((field) => field.reviewStatus === "PENDING" && field.confidence >= threshold && field.sourcePage !== null && Boolean(field.sourceText?.trim()));
+  if (!eligible.length) throw new Error("No pending fields meet the confidence and evidence threshold.");
+  await db.$transaction(async (tx) => {
+    for (const field of eligible) {
+      const revision = field.reviewerRevision + 1;
+      await tx.extractedFieldRevision.create({ data: { extractedFieldId: field.id, reviewerId: user.id, beforeValue: field.reviewedValue ?? field.normalizedValue ?? field.extractedValue, afterValue: field.extractedValue, beforeStatus: field.reviewStatus, afterStatus: "APPROVED", beforeReason: field.reviewReason, afterReason: `Batch approved at ${Math.round(threshold * 100)}% confidence`, sourceRevision: revision } });
+      await tx.extractedField.update({ where: { id: field.id }, data: { reviewStatus: "APPROVED", validationState: "VALID", reviewedValue: field.extractedValue, reviewReason: `Batch approved at ${Math.round(threshold * 100)}% confidence`, reviewerId: user.id, reviewedAt: new Date(), reviewerRevision: revision } });
+      await tx.auditEvent.create({ data: { userId: user.id, clientCaseId, action: "EXTRACTION_BATCH_APPROVED", entityType: "ExtractedField", entityId: field.id, metadata: `Batch approval revision ${revision}; threshold ${threshold.toFixed(2)}; source evidence present` } });
+    }
+  });
+  await runWithOrganization(user.organizationId, () => invalidateCaseDrafts(clientCaseId, user.id, "High-confidence source-document fields were batch approved."));
+  activateOrganizationContext(user);
+  revalidatePath(`/cases/${clientCaseId}/documents`);
+  revalidatePath(`/cases/${clientCaseId}/requirements`);
+}
+
+export async function escalateExtractionAction(clientCaseId: string, fieldId: string, formData: FormData) {
+  const user = activateOrganizationContext(await requireRole(["CASEWORKER", "REVIEWER", "SUPERVISOR"]));
+  if (!(await canAccessCase(user, clientCaseId))) throw new Error("Case access denied.");
+  const reason = z.string().trim().min(10).max(1000).parse(formData.get("reason"));
+  const field = await db.extractedField.findFirstOrThrow({ where: { id: fieldId, uploadedDocument: { clientCaseId, quarantineStatus: "CLEAR", deletedAt: null } } });
+  const afterReason = `Escalated to supervisor: ${reason}`;
+  await db.$transaction(async (tx) => {
+    const revision = field.reviewerRevision + 1;
+    await tx.extractedFieldRevision.create({ data: { extractedFieldId: field.id, reviewerId: user.id, beforeValue: field.reviewedValue ?? field.normalizedValue ?? field.extractedValue, afterValue: null, beforeStatus: field.reviewStatus, afterStatus: "CONFLICTING", beforeReason: field.reviewReason, afterReason, sourceRevision: revision } });
+    await tx.extractedField.update({ where: { id: field.id }, data: { reviewStatus: "CONFLICTING", validationState: "CONFLICTING_VALUE", reviewedValue: null, reviewReason: afterReason, reviewerId: user.id, reviewedAt: new Date(), reviewerRevision: revision } });
+    await tx.auditEvent.create({ data: { userId: user.id, clientCaseId, action: "EXTRACTION_ESCALATED", entityType: "ExtractedField", entityId: field.id, metadata: `Extraction escalation revision ${revision}; reason retained in the authorized review surface` } });
+  });
+  await runWithOrganization(user.organizationId, () => invalidateCaseDrafts(clientCaseId, user.id, "A source-document field was escalated for supervisor review."));
   activateOrganizationContext(user);
   revalidatePath(`/cases/${clientCaseId}/documents`);
   revalidatePath(`/cases/${clientCaseId}/requirements`);

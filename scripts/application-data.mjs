@@ -25,6 +25,7 @@ export const applicationDataModels = [
   "applicationDraftField",
   "applicationDraftDocument",
   "extractedField",
+  "extractedFieldRevision",
   "applicationPacket",
   "secureDownload",
   "packetField",
