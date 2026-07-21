@@ -1,6 +1,10 @@
 # Agency template onboarding
 
-Real-agency templates are intentionally gated. A synthetic AcroForm can continue to support local QA, but a template marked **Real agency deployment template** cannot be published until its external evidence is recorded.
+This is self-service: each organization uploads and configures its own form. No agency PDF is bundled with the project and no organization can see another organization’s template. Real-agency templates are intentionally gated. A synthetic AcroForm can continue to support local QA, but a template marked **Use for real agency deployment** cannot be published until its external evidence is recorded.
+
+## Bring your own template
+
+From **Admin → Program → Create template**, choose **Agency fillable PDF**, upload the organization’s own PDF, and select **Use for real agency deployment** when the version is intended for live use. The builder discovers the AcroForm fields and opens the mapping editor; administrators then choose the canonical mapping, required/optional state, formatting, and validation rules for each field.
 
 ## Required evidence per version
 
