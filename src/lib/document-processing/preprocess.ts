@@ -1,7 +1,7 @@
 import sharp from "sharp";
 
-const maxImageDimension = 2400;
-const skewSampleWidth = 800;
+const maxImageDimension = 1024;
+const skewSampleWidth = 400;
 
 function estimateDeskewAngle(data: Buffer, width: number, height: number) {
   const centerX = width / 2;

@@ -2,17 +2,17 @@
 
 ## Current enforcement decision (2026-07-16)
 
-Applicant documents are classified as `CUSTOMER_SENSITIVE` at the storage-processing boundary. The application blocks every external AI processor for that class and production configuration requires `DOCUMENT_PROCESSOR=disabled`. This is a deliberate fail-closed control: caseworkers use manual review for real applicant documents. Provider probes and direct adapter tests may use synthetic payloads only.
+Applicant documents are classified as `CUSTOMER_SENSITIVE` at the storage-processing boundary. The application blocks every external AI processor for that class; only loopback Ollama is permitted in an explicitly approved local configuration, while production configuration requires `DOCUMENT_PROCESSOR=disabled` until the organization signs off. Cloud provider probes and adapters are unavailable.
 
 The default local model is Ollama `qwen2.5vl:7b`, a 7B vision-language model suitable for text and image fixtures. The host must keep the Ollama service, model files, logs, and backups access-controlled.
 
-The runtime catalog contains only self-hosted Ollama on a localhost endpoint for synthetic evaluation. Every cloud provider and arbitrary gateway is retired from runtime selection. Existing cloud credentials and legacy environment variables should be removed from deployments.
+The runtime catalog contains only self-hosted Ollama on a localhost endpoint. Every cloud provider and arbitrary gateway is retired from runtime selection. Existing cloud credentials and legacy environment variables should be removed from deployments.
 
 Reviewed July 16, 2026. This is an engineering due-diligence record, not legal approval. The listed providers are synthetic-evaluation options only; production customer-data configuration rejects every external processor. An organization must document its own contract, DPA, region, subprocessors, incident terms, and lawful basis before using synthetic evaluation.
 
 | Provider | Observed official position | Engineering disposition for applicant documents |
 | --- | --- | --- |
-| Ollama (self-hosted) | Processing occurs on operator-controlled infrastructure. | Synthetic evaluation only in this application; the operator remains responsible for host logs, backups, and access controls. |
+| Ollama (self-hosted) | Processing occurs on operator-controlled infrastructure. | Allowed only on a loopback endpoint in an approved local configuration; production remains disabled until the organization approves host logs, backups, access controls, retention, and review procedures. |
 | Google Gemini API | Unpaid services may use inputs/outputs for product improvement and human review. Paid API content is not used for product improvement, but prompts and responses are logged for abuse monitoring; Google states a 55-day period. | Block by default. Consider only paid service after DPA, transfer/region, 55-day retention, and sensitive-data review. Never use unpaid quota for applicant data. |
 | GroqCloud | Inference content is not retained by default except temporary reliability/abuse logs for up to 30 days. Organization controls can enable zero data retention; usage metadata remains. | Conditional. Require organization-wide ZDR, persistence features disabled, DPA/security review, U.S. processing approval, and a dedicated key. |
 | OpenRouter | OpenRouter prompt logging/training opt-ins are off by default and per-request ZDR routing is available, but requests are also governed by the selected downstream model provider. Metadata remains. | Conditional. The adapter sends `provider.zdr=true`; also require account guardrails, fixed provider/model allowlists, logging disabled, downstream-provider review, DPA, and a dedicated key. |

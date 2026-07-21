@@ -11,6 +11,8 @@
     "doctor": "node scripts/doctor.mjs",
     "setup:ollama": "node scripts/setup-ollama.mjs",
     "ai:check": "node scripts/setup-ollama.mjs --check --verify",
+    "ai:start": "node scripts/start-ollama.mjs",
+    "ai:verify": "node --conditions=react-server --import tsx scripts/verify-local-ai.ts",
     "dev": "next dev",
     "build": "next build",
     "start": "node --conditions=react-server --import tsx scripts/start-production.ts",

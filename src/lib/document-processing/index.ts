@@ -13,7 +13,7 @@ function ollamaEndpoint() {
 export function getDocumentProcessor() {
   if (env.DOCUMENT_PROCESSOR === "disabled") return new DisabledDocumentProcessor();
   const compatible: Record<string, CompatibleConfig> = {
-    ollama: { name: "Ollama (local)", apiKey: env.OLLAMA_API_KEY, model: env.OLLAMA_MODEL, endpoint: ollamaEndpoint(), requiresApiKey: false, renderPdf: true, body: { keep_alive: "10m", options: { num_predict: 800 } } },
+    ollama: { name: "Ollama (local)", apiKey: env.OLLAMA_API_KEY, model: env.OLLAMA_MODEL, endpoint: ollamaEndpoint(), requiresApiKey: false, renderPdf: true, body: { keep_alive: "10m", options: { num_predict: 400 } } },
   };
   const config = compatible[env.DOCUMENT_PROCESSOR];
   if (config) return new CustomerDataPolicyProcessor(new OpenAICompatibleDocumentProcessor(config), env.DOCUMENT_PROCESSOR);

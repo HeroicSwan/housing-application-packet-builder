@@ -33,7 +33,7 @@ Caseworker, reviewer, and administrator workflows share a reviewed canonical pro
 
 ### Document processing
 
-`src/lib/document-processing` exposes a provider interface. The mock provider is the supported default, and the only live adapter is self-hosted Ollama on localhost for explicitly synthetic evaluation payloads. Customer-sensitive documents are fail-closed before any provider call. Proposed fields require staff review before they become reusable evidence.
+`src/lib/document-processing` exposes a provider interface. The mock provider is the deterministic default, and the only live adapter is self-hosted Ollama on localhost. Cloud providers and arbitrary remote gateways are unavailable. Customer-sensitive documents can only reach the loopback Ollama process in an explicitly approved local configuration; production configuration remains fail-closed with AI disabled. Proposed fields require staff review before they become reusable evidence.
 
 ### PDFs and application templates
 

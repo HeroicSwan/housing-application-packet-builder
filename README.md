@@ -15,7 +15,7 @@ This package is synthetic-data ready and locally validated. It is not an authori
 
 ## Validation snapshot
 
-- `npm run validate`: 11/11 safe checks passed.
+- `npm run validate`: 12/12 safe checks passed in the latest local run; live infrastructure and organizational gates remain explicitly blocked until configured.
 - Unit/integration: 207 passed, 5 skipped.
 - Browser and automated accessibility: 11 passed.
 - Synthetic evaluation: 120 adversarial applicants passed.
@@ -80,6 +80,14 @@ DOCUMENT_PROCESSOR_TIMEOUT_MS=120000
 
 Verify the model with `ollama run qwen2.5vl:7b "Reply with exactly: OLLAMA_READY"`. Full AI setup and troubleshooting are in [`docs/local-ollama.md`](docs/local-ollama.md).
 
+The project can start and verify the local service for you:
+
+```text
+npm run ai:start
+npm run ai:check
+npm run ai:verify
+```
+
 ### 4. Start and use the application
 
 ```text
@@ -109,7 +117,7 @@ npm run test:e2e
 npm run evaluate
 ```
 
-`npm run validate` runs the complete safe gate: production schema validation, secret and history scans, lint, typecheck, unit/integration tests, the 120-applicant synthetic evaluation, production build, browser/accessibility tests, and dependency audit.
+`npm run validate` runs the complete safe gate: production schema validation, secret and history scans, lint, typecheck, unit/integration tests, the 120-applicant synthetic evaluation, production build, browser/accessibility tests, dependency audit, and the local `qwen2.5vl:7b` PDF/image contract verification. Each check has a timeout and its own log; the report separates passed checks, failures, environment blockers, and organizational approvals.
 
 ### 6. Important risk statement
 

@@ -43,7 +43,7 @@ Status reviewed July 15, 2026. This checklist tracks the attached nonprofit-read
 
 | Command | Result | Measured duration or count |
 | --- | --- | --- |
-| `npm run validate` | Passed | Production schema, current/history secret scans, lint, typecheck, 204 unit/integration tests, 120-applicant evaluation, production build, 11 browser/axe tests, and dependency audit. |
+| `npm run validate` | Passed | Production schema, current/history secret scans, lint, typecheck, 207 unit/integration tests, 120-applicant evaluation, production build, 11 browser/axe tests, dependency audit, and local `qwen2.5vl:7b` PDF/image verification. |
 | `npm test` | Passed | 36 files passed, 5 skipped; 204 tests passed, 5 skipped. |
 | `npm run test:e2e` | Passed | 11 Chromium tests including axe checks. |
 | `npm run lint` | Passed | No errors or warnings. |

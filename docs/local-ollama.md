@@ -28,6 +28,12 @@ On Windows and macOS, install the official desktop application, then open a new 
 ollama serve
 ```
 
+The project also provides a readiness command that starts a detached local service when the loopback endpoint is not already available:
+
+```text
+npm run ai:start
+```
+
 ## Download the exact model
 
 Run this once on every machine that will process documents:
@@ -80,6 +86,12 @@ Then verify the application and its synthetic-only contract:
 npm run healthcheck
 npm run evaluate
 npm run validate
+```
+
+For the complete local model contract—four synthetic PDFs, one rendered image, evidence/page checks, confidence thresholds, abstention, conflict detection, human-review routing, and network-egress checks—run:
+
+```text
+npm run ai:verify
 ```
 
 The application still requires human review of every extracted value. A model response is a suggestion with source and confidence metadata, not an automatically accepted housing eligibility decision.

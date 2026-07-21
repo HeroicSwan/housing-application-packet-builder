@@ -55,11 +55,11 @@ test("caseworker and reviewer complete correction and approval lifecycle", async
   const legalName = page.getByTestId("extraction-legal_name");
   await legalName.getByLabel("Reviewed value for legal_name").fill("Jordan Lee");
   await legalName.getByTitle("Save edit").click();
-  await expect(legalName.getByText("Edited")).toBeVisible();
+  await expect(legalName.getByText("Edited", { exact: true })).toBeVisible();
   await page.getByTestId("extraction-date_of_birth").getByTitle("Approve").click();
   await page.getByTestId("extraction-document_number").getByLabel("Review reason for document_number").fill("Synthetic document number is intentionally invalid.");
   await page.getByTestId("extraction-document_number").getByTitle("Reject").click();
-  await expect(page.getByTestId("extraction-document_number").getByText("Rejected")).toBeVisible();
+  await expect(page.getByTestId("extraction-document_number").getByText("Rejected", { exact: true })).toBeVisible();
 
   await page.locator("#file").setInputFiles({ name: "sample-income.pdf", mimeType: "application/pdf", buffer: await validPdf("Synthetic income fixture") });
   await page.getByLabel("Document category").selectOption("INCOME");

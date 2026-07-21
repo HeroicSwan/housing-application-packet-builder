@@ -34,14 +34,14 @@ describe("local document processor selection", () => {
     expect(String(fetchSpy.mock.calls[0][0])).toBe("http://127.0.0.1:11434/v1/chat/completions");
   });
 
-  it("blocks customer-sensitive payloads before the local model request", async () => {
+  it("allows customer-sensitive payloads only through local Ollama", async () => {
     vi.stubEnv("DOCUMENT_PROCESSOR", "ollama");
-    const fetchSpy = vi.fn();
+    const fetchSpy = vi.fn().mockResolvedValue(chatResponse());
     vi.stubGlobal("fetch", fetchSpy);
     vi.resetModules();
     const { getDocumentProcessor } = await import("@/lib/document-processing");
-    expect(() => getDocumentProcessor().processDocument({ ...textInput, dataClass: "CUSTOMER_SENSITIVE" })).toThrow("External AI processing is disabled");
-    expect(fetchSpy).not.toHaveBeenCalled();
+    await expect(getDocumentProcessor().processDocument({ ...textInput, dataClass: "CUSTOMER_SENSITIVE" })).resolves.toMatchObject({ category: "OTHER" });
+    expect(fetchSpy).toHaveBeenCalled();
   });
 
   it("rejects cloud provider configuration at environment parsing", async () => {

@@ -14,7 +14,7 @@ import { enqueueBackgroundJob, runNextOrganizationJob } from "@/lib/jobs";
 import { invalidateCaseDrafts } from "@/lib/applications/integrity";
 import { runWithOrganization } from "@/lib/tenant-context";
 
-const categorySchema = z.enum(["IDENTITY", "INCOME", "RESIDENCY", "HOUSEHOLD", "DISABILITY", "HOMELESSNESS_VERIFICATION", "OTHER"]);
+const categorySchema = z.string().trim().min(1).max(120).regex(/^[A-Za-z0-9][A-Za-z0-9 _-]*$/);
 const reviewStatuses = ["APPROVED", "EDITED", "REJECTED", "UNREADABLE", "MISSING", "EXPIRED", "INVALID", "CONFLICTING"] as const;
 const reviewSchema = z.object({ status: z.enum(reviewStatuses), reviewedValue: z.string().trim().max(500), reason: z.string().trim().max(1000) });
 const validationStateByReview = { APPROVED: "VALID", EDITED: "CORRECTED", REJECTED: "INVALID", UNREADABLE: "UNREADABLE_SCAN", MISSING: "MISSING_VALUE", EXPIRED: "EXPIRED_DOCUMENT", INVALID: "INVALID_FORMAT", CONFLICTING: "CONFLICTING_VALUE" } as const;
@@ -28,7 +28,7 @@ export async function uploadDocumentAction(clientCaseId: string, _previousState:
   if (!(file instanceof File) || file.size === 0) return { message: "Choose a document to upload.", error: true };
   const validation = validateUpload(file, env.MAX_UPLOAD_MB);
   if (!validation.valid) return { message: validation.error, error: true };
-  const parsedCategory = categorySchema.safeParse(formData.get("category"));
+  const parsedCategory = categorySchema.safeParse(formData.get("customCategory") || formData.get("category"));
   if (!parsedCategory.success) return { message: "Choose a valid document category.", error: true };
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (!validateFileSignature(bytes, file.type)) return { message: "The file contents do not match the selected PDF or image type.", error: true };
