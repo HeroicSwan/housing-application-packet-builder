@@ -57,7 +57,7 @@ Dependency auditing and a production-only audit both passed with zero vulnerabil
 
 ## Documentation created or updated
 
-README, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, SUPPORT, CHANGELOG, architecture, local-development, operator-runbook, data-handling, release-process, version-1-criteria, deployment, responsible-AI, fixture, and caseworker-usability documents now describe observed behavior, limitations, safe local operations, and future gates without claiming production readiness.
+README, SECURITY, SUPPORT, CHANGELOG, architecture, local-development, operator-runbook, data-handling, release-process, version-1-criteria, deployment, responsible-AI, fixture, and caseworker-usability documents now describe observed behavior, limitations, safe local operations, and future gates without claiming production readiness.
 
 ## Exact commands executed
 
