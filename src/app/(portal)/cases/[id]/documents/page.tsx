@@ -19,7 +19,7 @@ export default async function DocumentsPage({ params }: { params: Promise<{ id: 
   const user = activateOrganizationContext(await requireRole(["CASEWORKER", "REVIEWER", "SUPERVISOR", "AUDITOR"]));
   const { id } = await params;
   if (!(await canAccessCase(user, id))) notFound();
-  const clientCase = await db.clientCase.findUnique({ where: { id }, include: { documents: { include: { extractedFields: { include: { revisions: { include: { reviewer: { select: { name: true } } }, orderBy: { createdAt: "desc" } } } }, uploadedBy: true }, orderBy: { uploadedAt: "desc" } } } });
+  const [clientCase, documentProfiles] = await Promise.all([db.clientCase.findUnique({ where: { id }, include: { documents: { include: { extractedFields: { include: { revisions: { include: { reviewer: { select: { name: true } } }, orderBy: { createdAt: "desc" } } } }, uploadedBy: true }, orderBy: { uploadedAt: "desc" } } } }), db.documentProfile.findMany({ where: { organizationId: user.organizationId, active: true }, orderBy: { key: "asc" } })]);
   if (!clientCase) notFound();
   const originals = new Map(clientCase.documents.map((document) => [document.id, document.originalFilename]));
   const fieldSources = new Map<string, Array<{ filename: string; value: string; status: string }>>();
@@ -42,7 +42,7 @@ export default async function DocumentsPage({ params }: { params: Promise<{ id: 
     <CaseHeader clientCase={clientCase} />
     <section className="mt-10">
       <SectionHeading index="03" title="Supporting documents" description="Extraction is a proposal. Staff must approve, correct, or classify every value before it can be relied on." />
-      {user.role === "CASEWORKER" && <UploadDocumentForm action={uploadDocumentAction.bind(null, id)} />}
+      {user.role === "CASEWORKER" && <UploadDocumentForm action={uploadDocumentAction.bind(null, id)} categories={documentProfiles.length ? documentProfiles.map((profile) => profile.category) : undefined} />}
       <div className="mt-7 space-y-5">{clientCase.documents.length ? clientCase.documents.map((document) => {
         const fields = document.extractedFields.map((field) => ({ ...field, conflicts: (fieldSources.get(field.fieldName) ?? []).filter((source) => source.filename !== document.originalFilename && source.value.trim().toLowerCase() !== (field.reviewedValue ?? field.normalizedValue ?? field.extractedValue).trim().toLowerCase()) }));
         const pendingHighConfidence = document.extractedFields.filter((field) => field.reviewStatus === "PENDING" && field.confidence >= 0.9 && field.sourcePage !== null && Boolean(field.sourceText?.trim())).length;

@@ -31,7 +31,7 @@ const programSchema = z.object({
 });
 const requirementSchema = z.object({
   name: z.string().trim().min(3).max(160),
-  category: z.enum(["IDENTITY", "INCOME", "RESIDENCY", "HOUSEHOLD", "DISABILITY", "HOMELESSNESS_VERIFICATION", "OTHER"]),
+  category: z.string().trim().min(1).max(120).regex(/^[A-Za-z0-9][A-Za-z0-9 _-]*$/),
   description: z.string().trim().min(5).max(1000),
   isRequired: z.boolean(),
   expirationPeriodDays: z.number().int().positive().max(3650).nullable(),
@@ -44,7 +44,8 @@ function parseProgram(formData: FormData) {
 }
 function parseRequirement(formData: FormData) {
   const expiration = String(formData.get("expirationPeriodDays") ?? "").trim();
-  return requirementSchema.parse({ name: formData.get("name"), category: formData.get("category"), description: formData.get("description"), isRequired: formData.get("isRequired") === "on", expirationPeriodDays: expiration ? Number(expiration) : null, requiredFieldName: String(formData.get("requiredFieldName") ?? "").trim() || null, applicableHouseholdRules: String(formData.get("applicableHouseholdRules") ?? "") || null });
+  const customCategory = String(formData.get("customCategory") ?? "").trim();
+  return requirementSchema.parse({ name: formData.get("name"), category: customCategory || formData.get("category"), description: formData.get("description"), isRequired: formData.get("isRequired") === "on", expirationPeriodDays: expiration ? Number(expiration) : null, requiredFieldName: String(formData.get("requiredFieldName") ?? "").trim() || null, applicableHouseholdRules: String(formData.get("applicableHouseholdRules") ?? "") || null });
 }
 
 export async function createProgramAction(formData: FormData) {
@@ -253,7 +254,7 @@ export async function rollbackApplicationTemplateAction(templateId: string) {
 
 export async function addSubmissionDestinationAction(programId: string, formData: FormData) {
   const user = activateOrganizationContext(await requireRole(["ADMIN"]));
-  const type = z.enum(["EMAIL", "API", "PORTAL_API"]).parse(formData.get("type"));
+  const type = z.enum(["EMAIL", "API", "PORTAL_API", "WEBHOOK"]).parse(formData.get("type"));
   const endpoint = z.string().trim().parse(String(formData.get("endpoint") ?? "")) || null;
   if (type !== "EMAIL" && (!endpoint || !z.string().url().safeParse(endpoint).success || (!endpoint.startsWith("https://") && process.env.NODE_ENV === "production"))) throw new Error("API destinations require a valid HTTPS endpoint.");
   const recipient = z.string().trim().parse(String(formData.get("recipient") ?? "")) || null;

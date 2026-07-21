@@ -52,6 +52,9 @@ model Organization {
   backgroundJobs           BackgroundJob[]
   setupSections            OrganizationSetupSection[]
   secureDownloads          SecureDownload[]
+  fieldDefinitions         AgencyFieldDefinition[]
+  workflowDefinitions      WorkflowDefinition[]
+  documentProfiles         DocumentProfile[]
 }
 
 model User {
@@ -224,12 +227,80 @@ model ClientCase {
   incomeRecords              IncomeRecord[]
   consents                   ConsentRecord[]
   lifecycleRequests          DataLifecycleRequest[]
+  customFieldValues          CaseFieldValue[]
 
   @@unique([organizationId, referenceNumber])
   @@index([assignedCaseworkerId, status])
   @@index([organizationId, status])
   @@index([organizationId, normalizedLegalName, dateOfBirth])
   @@index([organizationId, dueDate])
+}
+
+model AgencyFieldDefinition {
+  id               String                @id @default(cuid())
+  organizationId   String
+  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  key              String
+  label            String
+  fieldType        String                @default("TEXT")
+  required         Boolean               @default(false)
+  validationRules  String?
+  optionsJson      String?
+  helpText         String?
+  active           Boolean               @default(true)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  values           CaseFieldValue[]
+
+  @@unique([organizationId, key])
+  @@index([organizationId, active])
+}
+
+model CaseFieldValue {
+  id           String              @id @default(cuid())
+  clientCaseId String
+  clientCase   ClientCase          @relation(fields: [clientCaseId], references: [id], onDelete: Cascade)
+  definitionId String
+  definition   AgencyFieldDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+  value        String?
+  sourceType   String              @default("STAFF_ENTRY")
+  updatedAt    DateTime            @updatedAt
+
+  @@unique([clientCaseId, definitionId])
+  @@index([clientCaseId])
+}
+
+model WorkflowDefinition {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  key            String
+  name           String
+  stagesJson     String        @default("[]")
+  active         Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([organizationId, key])
+  @@index([organizationId, active])
+}
+
+model DocumentProfile {
+  id               String        @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  key              String
+  name             String
+  category         String
+  extractionPrompt String?
+  required         Boolean       @default(false)
+  validationRules  String?
+  active           Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@unique([organizationId, key])
+  @@index([organizationId, category, active])
 }
 
 model HouseholdMember {

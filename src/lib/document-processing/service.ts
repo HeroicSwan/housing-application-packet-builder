@@ -20,11 +20,12 @@ async function markCaseFieldConflicts(clientCaseId: string) {
 }
 
 export async function processStoredDocument(documentId: string, userId: string) {
-  const document = await db.uploadedDocument.findUniqueOrThrow({ where: { id: documentId } });
+  const document = await db.uploadedDocument.findUniqueOrThrow({ where: { id: documentId }, include: { clientCase: { select: { organizationId: true } } } });
   if (document.quarantineStatus !== "CLEAR" || document.deletedAt) throw new Error("Quarantined or deleted documents cannot be processed.");
   try {
     const bytes = await getLegacyOrStoredObject(document);
-    const result = processingResultSchema.parse(await getDocumentProcessor().processDocument({ filename: document.originalFilename, mimeType: document.fileType, bytes, category: document.documentCategory, dataClass: "CUSTOMER_SENSITIVE" }));
+    const profile = await db.documentProfile.findFirst({ where: { organizationId: document.clientCase.organizationId, category: document.documentCategory, active: true } });
+    const result = processingResultSchema.parse(await getDocumentProcessor().processDocument({ filename: document.originalFilename, mimeType: document.fileType, bytes, category: document.documentCategory, customPrompt: profile?.extractionPrompt ?? undefined, dataClass: "CUSTOMER_SENSITIVE" }));
     const processingWarnings = result.warnings.filter(Boolean);
     const processingStatus = env.DOCUMENT_PROCESSOR === "ollama" && processingWarnings.length ? "COMPLETED_WITH_REVIEW" : "COMPLETED";
     await db.$transaction(async (tx) => {

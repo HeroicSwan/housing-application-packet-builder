@@ -40,7 +40,7 @@ function canonical(value: string | number | boolean | null | undefined, referenc
 }
 
 export async function buildCanonicalApplicationData(clientCaseId: string): Promise<CanonicalApplicationData> {
-  const clientCase = await db.clientCase.findUniqueOrThrow({ where: { id: clientCaseId }, include: { assignedCaseworker: true, incomeRecords: true, householdMembers: { orderBy: { createdAt: "asc" } }, documents: { include: { extractedFields: true }, orderBy: { uploadedAt: "asc" } } } });
+  const clientCase = await db.clientCase.findUniqueOrThrow({ where: { id: clientCaseId }, include: { assignedCaseworker: true, incomeRecords: true, householdMembers: { orderBy: { createdAt: "asc" } }, customFieldValues: { include: { definition: true } }, documents: { include: { extractedFields: true }, orderBy: { uploadedAt: "asc" } } } });
   const activeIncome = clientCase.incomeRecords.filter((record) => !record.endDate || record.endDate >= new Date());
   const incomeTotals = { EARNED: 0, BENEFIT: 0, OTHER: 0 }; for (const record of activeIncome) incomeTotals[record.incomeType as keyof typeof incomeTotals] += normalizeMonthlyIncome(record);
   const values: Record<string, CanonicalValue> = {
@@ -54,6 +54,7 @@ export async function buildCanonicalApplicationData(clientCaseId: string): Promi
     "client.contactPermission": canonical(clientCase.contactPermission), "client.transportationNeeds": canonical(clientCase.transportationNeeds), "client.desiredMoveInDate": canonical(clientCase.desiredMoveInDate?.toISOString().slice(0, 10)), "client.evictionHistory": canonical(clientCase.evictionHistory), "client.rentalArrears": canonical(clientCase.rentalArrearsCents), "client.preferredContactMethod": canonical(null),
     "assignedCaseworker.name": canonical(clientCase.assignedCaseworker.name, "Assigned caseworker"), "application.applicationDate": { value: new Date().toISOString().slice(0, 10), sourceType: "DEFAULT", sourceReference: "Application creation date" },
   };
+  for (const item of clientCase.customFieldValues.filter((entry) => entry.definition.active)) values[`custom.${item.definition.key}`] = canonical(item.value, `Agency-specific field: ${item.definition.label}`);
   const observed: Record<string, { value: string; reference: string; reviewed: boolean }[]> = {};
   for (const document of clientCase.documents) for (const field of document.extractedFields.filter((item) => item.reviewStatus !== "REJECTED")) {
     const path = fieldToPath[field.fieldName];

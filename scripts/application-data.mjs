@@ -1,6 +1,10 @@
 export const applicationDataModels = [
   "organization",
   "organizationSetupSection",
+  "agencyFieldDefinition",
+  "caseFieldValue",
+  "workflowDefinition",
+  "documentProfile",
   "user",
   "mfaChallenge",
   "authSession",

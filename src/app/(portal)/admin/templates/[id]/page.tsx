@@ -66,19 +66,20 @@ export default async function TemplateEditorPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  activateOrganizationContext(await requireRole(["ADMIN"]));
+  const admin = activateOrganizationContext(await requireRole(["ADMIN"]));
   const { id } = await params;
-  const template = await db.applicationTemplate.findUnique({
+  const [template, customDefinitions] = await Promise.all([db.applicationTemplate.findUnique({
     where: { id },
     include: {
       housingProgram: true,
       fields: { orderBy: { displayOrder: "asc" } },
       supersedesTemplate: { include: { fields: true } },
     },
-  });
+  }), db.agencyFieldDefinition.findMany({ where: { organizationId: admin.organizationId, active: true }, orderBy: { key: "asc" } })]);
   if (!template) notFound();
   const editable = template.status === "DRAFT";
   const compatibility = template.supersedesTemplate ? compareTemplateVersions(template.supersedesTemplate.fields, template.fields) : { compatible: true, blockers: [], added: [], removed: [], changed: [] };
+  const availablePaths = [...canonicalPaths.filter(Boolean), ...customDefinitions.map((definition) => `custom.${definition.key}`)];
   return (
     <div>
       <Link
@@ -205,7 +206,7 @@ export default async function TemplateEditorPage({
                   className="h-9 w-full border bg-white px-3 text-sm"
                 >
                   <option value="">Staff entry / unmapped</option>
-                  {canonicalPaths.filter(Boolean).map((path) => (
+                  {availablePaths.map((path) => (
                     <option key={path}>{path}</option>
                   ))}
                 </select>
@@ -283,7 +284,7 @@ export default async function TemplateEditorPage({
                 className="h-9 border bg-white px-3"
               >
                 <option value="">Staff entry / unmapped</option>
-                {canonicalPaths.filter(Boolean).map((path) => (
+                {availablePaths.map((path) => (
                   <option key={path}>{path}</option>
                 ))}
               </select>

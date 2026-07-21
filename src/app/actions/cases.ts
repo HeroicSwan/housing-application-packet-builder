@@ -95,6 +95,16 @@ async function requireUpdated(result: { count: number }) {
   if (result.count !== 1) throw new Error("This record changed in another session. Refresh the page before trying again.");
 }
 
+async function allowedCaseStatuses(organizationId: string) {
+  const workflow = await db.workflowDefinition.findFirst({ where: { organizationId, key: "case_management", active: true } });
+  let stages: unknown = [];
+  if (workflow) {
+    try { stages = JSON.parse(workflow.stagesJson) as unknown; } catch { stages = []; }
+  }
+  const custom = Array.isArray(stages) ? stages.flatMap((stage) => typeof stage === "object" && stage !== null && "key" in stage && typeof stage.key === "string" ? [stage.key] : []) : [];
+  return new Set<string>([...caseStatuses, ...custom]);
+}
+
 export async function createCaseAction(_previousState: CaseFormState, formData: FormData): Promise<CaseFormState> {
   const user = activateOrganizationContext(await requireRole(["CASEWORKER", "ADMIN"]));
   const raw = formValues(formData);
@@ -165,9 +175,32 @@ export async function updateCaseAction(clientCaseId: string, _previousState: Cas
   return { message: "Client information saved.", errors: {}, values: { ...raw, recordVersion: String(version.data + 1) } };
 }
 
+export async function updateCustomCaseFieldsAction(clientCaseId: string, formData: FormData) {
+  const user = await requireCaseEditor(clientCaseId);
+  const definitions = await db.agencyFieldDefinition.findMany({ where: { organizationId: user.organizationId, active: true } });
+  const values = definitions.map((definition) => ({ definition, value: (definition.fieldType === "MULTI_SELECT" ? formData.getAll(`custom_${definition.key}`).map(String).filter(Boolean).join("|") : String(formData.get(`custom_${definition.key}`) ?? "")).trim() }));
+  for (const item of values) {
+    if (item.definition.required && !item.value) throw new Error(`${item.definition.label} is required.`);
+    if (!item.value || !item.definition.validationRules) continue;
+    try {
+      const rules = JSON.parse(item.definition.validationRules) as { minLength?: number; pattern?: string };
+      if (rules.minLength && item.value.length < rules.minLength) throw new Error(`${item.definition.label} is shorter than the configured minimum.`);
+      if (rules.pattern && !new RegExp(rules.pattern).test(item.value)) throw new Error(`${item.definition.label} does not match its configured format.`);
+    } catch (error) { if (error instanceof Error && !error.message.includes("JSON")) throw error; throw new Error(`The validation rule for ${item.definition.label} is invalid.`); }
+  }
+  await runWithOrganization(user.organizationId, async () => {
+    for (const item of values) await db.caseFieldValue.upsert({ where: { clientCaseId_definitionId: { clientCaseId, definitionId: item.definition.id } }, create: { clientCaseId, definitionId: item.definition.id, value: item.value || null }, update: { value: item.value || null, sourceType: "STAFF_ENTRY" } });
+    await invalidateCaseDrafts(clientCaseId, user.id, "Agency-specific case information changed.");
+    await recordAudit({ userId: user.id, clientCaseId, action: "CUSTOM_CASE_FIELDS_UPDATED", entityType: "ClientCase", entityId: clientCaseId, metadata: "Agency-specific case fields updated; values not logged" });
+  });
+  revalidatePath(`/cases/${clientCaseId}/client`);
+  revalidatePath(`/cases/${clientCaseId}/application`);
+}
+
 export async function updateCaseManagementAction(clientCaseId: string, formData: FormData) {
   const user = await requireCaseEditor(clientCaseId);
-  const status = z.enum(caseStatuses).parse(formData.get("status"));
+  const status = z.string().trim().min(1).max(80).parse(formData.get("status"));
+  if (!(await allowedCaseStatuses(user.organizationId)).has(status)) throw new Error("This status is not configured for the agency workflow.");
   const dueDate = optionalDate.parse(String(formData.get("dueDate") ?? ""));
   const internalNote = z.string().trim().max(8000).parse(String(formData.get("internalNote") ?? ""));
   const tags = encodeCaseTags(z.string().max(1000).parse(String(formData.get("tags") ?? "")));
@@ -195,7 +228,7 @@ export async function reopenCaseAction(clientCaseId: string, formData: FormData)
   const recordVersion = versionSchema.parse(formData.get("recordVersion"));
   const clientCase = await db.clientCase.findUniqueOrThrow({ where: { id: clientCaseId }, select: { status: true, statusBeforeArchive: true } });
   if (clientCase.status !== "ARCHIVED") throw new Error("Only archived cases can be reopened.");
-  const status = caseStatuses.includes(clientCase.statusBeforeArchive as typeof caseStatuses[number]) ? clientCase.statusBeforeArchive! : "INTAKE";
+  const status = (await allowedCaseStatuses(user.organizationId)).has(clientCase.statusBeforeArchive ?? "") ? clientCase.statusBeforeArchive! : "INTAKE";
   await requireUpdated(await db.clientCase.updateMany({ where: { id: clientCaseId, recordVersion, status: "ARCHIVED" }, data: { status, statusBeforeArchive: null, archivedAt: null, archiveReason: null, recordVersion: { increment: 1 } } }));
   await recordAudit({ userId: user.id, clientCaseId, action: "CASE_REOPENED", entityType: "ClientCase", entityId: clientCaseId, metadata: "Archived case reopened" });
   revalidatePath(`/cases/${clientCaseId}`);
