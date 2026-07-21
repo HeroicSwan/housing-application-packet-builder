@@ -46,6 +46,7 @@ npm --version
 ```text
 git clone https://github.com/HeroicSwan/housing-application-packet-builder.git
 cd housing-application-packet-builder
+npm run doctor
 npm ci
 npm run setup
 ```
@@ -59,6 +60,12 @@ The exact supported model is `qwen2.5vl:7b`. Install Ollama, then run:
 ```text
 ollama pull qwen2.5vl:7b
 ollama list
+```
+
+Or let the project download and configure it during setup:
+
+```text
+npm run setup -- --ollama
 ```
 
 Keep Ollama running with the desktop app or `ollama serve`. After `npm run setup`, edit `.env` to contain:

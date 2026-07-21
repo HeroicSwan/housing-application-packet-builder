@@ -11,6 +11,7 @@ const envExamplePath = path.join(repositoryRoot, ".env.example");
 // records. The first organization and administrator are created once through
 // /setup using the one-time bootstrap token printed at the end of this script.
 const blankInstall = process.argv.includes("--blank");
+const ollamaInstall = process.argv.includes("--ollama");
 
 function major(version) {
   return Number(version.replace(/^v/, "").split(".")[0]);
@@ -121,6 +122,7 @@ async function verifyLocalPaths(environment) {
 }
 
 try {
+  await run(process.execPath, [path.join(repositoryRoot, "scripts", "doctor.mjs")], "Checking local prerequisites");
   if (major(process.versions.node) < 22) throw new Error(`Node.js 22 or newer is required; found ${process.version}. Install a supported Node.js release and rerun setup.`);
   const npmVersion = (await npm(["--version"], "Checking npm version", true)).stdout;
   if (major(npmVersion) < 10) throw new Error(`npm 10 or newer is required; found ${npmVersion}. Upgrade npm and rerun setup.`);
@@ -141,12 +143,14 @@ try {
   const bootstrapToken = blankInstall ? await prepareBlankBootstrap(environment) : null;
   await npm(["test", "--", "tests/pdf.test.ts", "tests/document-safety.test.ts", "tests/security-and-approval.test.ts"], "Verifying PDF generation and upload safety");
   await run(process.execPath, [path.join(repositoryRoot, "scripts", "healthcheck.mjs"), "--start"], "Starting a temporary application and checking /api/health");
+  if (ollamaInstall) await run(process.execPath, [path.join(repositoryRoot, "scripts", "setup-ollama.mjs")], "Installing and configuring the local Ollama model");
   const appUrl = environment.APP_URL || "http://localhost:3000";
   if (blankInstall) {
     console.log("\nBLANK INSTALLATION — no demo accounts and no synthetic records were created.");
     console.log("This local profile has NOT completed the production hardening checklist.");
     console.log("Any real data you enter is at your own risk; review README and docs/production-operations.md first.");
     console.log(`1. Start the application: npm run dev (${appUrl})`);
+    if (ollamaInstall) console.log("Local AI configured: qwen2.5vl:7b (verify with npm run ai:check)");
     if (bootstrapToken) {
       console.log(`2. Open ${appUrl}/setup and claim the installation with this ONE-TIME token (shown only now):`);
       console.log(`   ${bootstrapToken}`);
@@ -160,6 +164,7 @@ try {
     console.log("Demo accounts: caseworker@example.org, reviewer@example.org, admin@example.org");
     console.log("Demo password: DemoHousing2026!");
     console.log("Start: npm run dev");
+    if (ollamaInstall) console.log("Local AI configured: qwen2.5vl:7b (verify with npm run ai:check)");
     console.log("Reset synthetic demo data: npm run demo:reset -- --yes");
     console.log("Prefer an empty installation for your own data? Run: npm run setup:blank");
   }

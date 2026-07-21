@@ -29,6 +29,7 @@ This is the complete path from a blank Windows, macOS, or Linux PC. Docker is no
    ```bash
    git clone https://github.com/HeroicSwan/housing-application-packet-builder.git
    cd housing-application-packet-builder
+   npm run doctor
    npm ci
    npm run setup
    npm run dev
@@ -37,6 +38,8 @@ This is the complete path from a blank Windows, macOS, or Linux PC. Docker is no
 4. Open `http://localhost:3000`. The synthetic demo accounts are `caseworker@example.org`, `reviewer@example.org`, and `admin@example.org`; the public demo password is `DemoHousing2026!`.
 
 `npm run setup` creates the disposable SQLite database, local-only secrets, synthetic storage, Prisma client, demo records, and health probes. It does not overwrite an existing `.env` or database.
+
+`npm run doctor` is read-only and reports missing prerequisites with repair commands. If you want the local AI model configured during the same bootstrap, install Ollama first and run `npm run setup -- --ollama`; this downloads and configures the exact `qwen2.5vl:7b` model without changing a production environment.
 
 ### Local Ollama setup (optional AI extraction)
 

@@ -1,6 +1,6 @@
 {
   "name": "housing-application-packet-builder",
-  "version": "1.0.0-rc.2",
+  "version": "1.0.0",
   "private": true,
   "engines": {
     "node": ">=22",
@@ -8,6 +8,9 @@
   },
   "scripts": {
     "setup": "node scripts/setup.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "setup:ollama": "node scripts/setup-ollama.mjs",
+    "ai:check": "node scripts/setup-ollama.mjs --check --verify",
     "dev": "next dev",
     "build": "next build",
     "start": "node --conditions=react-server --import tsx scripts/start-production.ts",

@@ -8,8 +8,10 @@ The supported evaluator workflow uses Node.js, npm, SQLite, synthetic fixtures, 
 
 - Node.js 22 or newer
 - npm 10 or newer
+- Git when cloning the repository (not required after downloading a source archive)
 - Windows, macOS, or Linux with write access to the repository
 - Chromium only when running browser E2E tests
+- Ollama 0.7 or newer only when enabling local AI extraction
 
 The setup command checks Node.js and npm before making application changes and exits nonzero with an actionable message when a version is unsupported.
 
@@ -23,6 +25,15 @@ Open a terminal in the repository root and run the same command on every support
 npm run setup
 npm run dev
 ```
+
+To install and configure the exact local AI model during the same setup, use:
+
+```text
+npm run setup -- --ollama
+npm run dev
+```
+
+The `--ollama` option checks for Ollama, downloads `qwen2.5vl:7b` when it is missing, and updates the synthetic `.env` to use the loopback Ollama endpoint. It never installs Ollama itself or changes a production `.env`. Install Ollama first from [ollama.com/download](https://ollama.com/download). You can configure it later with `npm run setup:ollama`.
 
 ### Windows Command Prompt
 
@@ -62,6 +73,8 @@ npm run open
 10. starts a temporary local server, checks application health, and shuts it down; and
 11. prints the application URL, demo login instructions, start command, and reset command.
 
+When `--ollama` is supplied, setup additionally checks the Ollama executable, pulls the exact `qwen2.5vl:7b` model if needed, and configures the local processor. Run `npm run ai:check` after setup to perform a real local inference smoke test.
+
 Setup never overwrites an existing `.env`, database, or stored file. If an existing `.env` lacks a newly required setting, setup reports the problem and leaves the file for the operator to review.
 
 ## Files created locally
@@ -91,7 +104,11 @@ The synthetic password for all three accounts is `DemoHousing2026!`. One-click r
 
 | Command | Purpose |
 | --- | --- |
+| `npm run doctor` | Check local prerequisites and show repair commands without changing files |
 | `npm run setup` | Idempotent first-run bootstrap and local acceptance probes |
+| `npm run setup -- --ollama` | Bootstrap plus download/configure local `qwen2.5vl:7b` |
+| `npm run setup:ollama` | Download/configure local Ollama after normal setup |
+| `npm run ai:check` | Verify the exact model and run a local inference smoke test |
 | `npm run dev` | Start the supported local development server |
 | `npm run open` | Open `APP_URL`, defaulting to `http://localhost:3000` |
 | `npm run open -- --start` | Start the local server if needed, then open it |
