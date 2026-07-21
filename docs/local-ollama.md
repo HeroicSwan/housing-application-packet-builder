@@ -84,6 +84,8 @@ npm run validate
 
 The application still requires human review of every extracted value. A model response is a suggestion with source and confidence metadata, not an automatically accepted housing eligibility decision.
 
+Read [`ai-extraction-quality.md`](./ai-extraction-quality.md) for preprocessing, page classification, category-specific prompts, abstention thresholds, conflict handling, and the synthetic gold-standard corpus.
+
 ## Real applicant data and production
 
 The default production configuration is intentionally fail-closed with `DOCUMENT_PROCESSOR=disabled`. An organization may enable the local Ollama path only after approving the exact model, host access controls, logs, retention, backups, incident response, and caseworker review procedure. Until then, leave processing disabled and enter values manually.

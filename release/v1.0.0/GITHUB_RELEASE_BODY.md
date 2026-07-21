@@ -11,6 +11,7 @@ Housing Application Packet Builder is a local-first workflow for nonprofit housi
 - Review, approval, electronic-consent, delivery, and audit workflows with lifecycle controls for quarantine, duplicates, exports, expiring downloads, escalation, and delivery dead letters.
 - Operations tooling for health checks, protected metrics, durable jobs, encrypted backups, restore procedures, and deployment validation.
 - A single `npm run validate` command that runs the safe repository checks and reports blockers clearly.
+- Safer local extraction quality controls: image preprocessing, page classification, category-specific prompts, JSON-schema output, evidence requirements, confidence abstention, conflict flags, and a versioned synthetic gold-standard corpus.
 
 ### Privacy and AI boundary
 
@@ -73,6 +74,8 @@ npm run evaluate
 
 The model must remain on loopback and Ollama's API must not be exposed to the public internet. The application keeps human review mandatory for every extracted value. For the complete Windows/macOS/Linux setup, hardware notes, troubleshooting, and production approval boundary, read [`docs/local-ollama.md`](https://github.com/HeroicSwan/housing-application-packet-builder/blob/master/docs/local-ollama.md).
 
+Extraction quality behavior is documented in [`docs/ai-extraction-quality.md`](https://github.com/HeroicSwan/housing-application-packet-builder/blob/master/docs/ai-extraction-quality.md), including the `0.75` confidence threshold, evidence/page requirements, abstention behavior, and synthetic gold-standard workflow.
+
 ### Test and evaluate
 
 Run the individual checks or the complete safe gate:
@@ -91,7 +94,7 @@ npm run validate
 
 ### Verification completed for this release
 
-- 205 unit and integration tests passed (5 intentionally skipped where live infrastructure is required).
+- 207 unit and integration tests passed (5 intentionally skipped where live infrastructure is required).
 - 11 browser and automated accessibility checks passed.
 - 120 synthetic applicants completed the stress/evaluation workflow.
 - Production build, lint, typecheck, secret scans, and dependency audit completed with zero high-severity dependency findings.

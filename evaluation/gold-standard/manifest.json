@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "syntheticOnly": true,
+  "cases": [
+    { "id": "identity-jordan", "file": "fixtures/jordan-state-identification.pdf", "category": "IDENTITY", "scenario": "identity", "expected": { "legal_name": { "value": "Jordan Rivera", "sourcePage": 1, "sourceText": "Name: Jordan Rivera" }, "date_of_birth": { "value": "1990-05-08", "sourcePage": 1, "sourceText": "DOB: 05/08/1990" }, "identification_type": { "value": "State identification card", "sourcePage": 1, "sourceText": "Document type: State ID" }, "identification_expiration_date": { "value": "2025-04-30", "sourcePage": 1, "sourceText": "Expires: 04/30/2025" } } },
+    { "id": "income-jordan", "file": "fixtures/jordan-income-statement.pdf", "category": "INCOME", "scenario": "income-period", "expected": { "gross_monthly_income": { "value": "1450.00", "sourcePage": 1, "sourceText": "Gross monthly income: $1,450.00" } } },
+    { "id": "benefits-jordan", "file": "fixtures/jordan-benefits-award.pdf", "category": "BENEFITS", "scenario": "benefits", "expected": { "monthly_benefits_income": { "value": "620.00", "sourcePage": 1, "sourceText": "Monthly benefit: $620.00" }, "benefit_programs": { "value": "SNAP; Medicaid", "sourcePage": 1, "sourceText": "Programs: SNAP and Medicaid" } } },
+    { "id": "verification-jordan", "file": "fixtures/jordan-homelessness-verification.pdf", "category": "HOMELESSNESS_VERIFICATION", "scenario": "signed-letter", "expected": { "homelessness_verification_date": { "value": "2026-06-25", "sourcePage": 1, "sourceText": "Verified on June 25, 2026" } } }
+  ]
+}

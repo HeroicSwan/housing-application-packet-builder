@@ -16,6 +16,7 @@ const checks = [
   ["lint", npm, [npmCli, "run", "lint"]],
   ["typecheck", npm, [npmCli, "run", "typecheck"]],
   ["unit-integration", npm, [npmCli, "test", "--", "--run"]],
+  ["gold-standard", npm, [npmCli, "run", "evaluation:gold"]],
   ["synthetic-evaluation", npm, [npmCli, "run", "evaluate"]],
   ["production-build", npm, [npmCli, "run", "build"]],
   ["browser-accessibility", npm, [npmCli, "run", "test:e2e"]],

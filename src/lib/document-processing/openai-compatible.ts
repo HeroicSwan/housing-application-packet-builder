@@ -1,7 +1,9 @@
 import { env } from "@/lib/env";
-import { processingResultSchema, type DocumentProcessingInput, type DocumentProcessingResult, type DocumentProcessor } from "./types";
-import { extractionPrompt, parseExtractionJson } from "./prompt";
+import { classificationResultSchema, processingResultSchema, type DocumentProcessingInput, type DocumentProcessingResult, type DocumentProcessor } from "./types";
+import { classificationJsonSchema, classificationPrompt, classifyPagesLocally, extractionJsonSchema, extractionPromptFor, parseClassificationJson, parseExtractionJson } from "./prompt";
 import { extractPdfText, renderPdfToPngDataUrls } from "./pdf-to-images";
+import { preprocessImage } from "./preprocess";
+import { enforceExtractionQuality, minimumFieldConfidence } from "./quality";
 
 type CompatibleConfig = {
   name: string;
@@ -17,6 +19,7 @@ type CompatibleConfig = {
   /** Some providers reject `response_format`; the extraction prompt still demands JSON and parsing tolerates prose wrappers. */
   omitResponseFormat?: boolean;
   renderPdf?: boolean;
+  responseSchema?: Record<string, unknown>;
 };
 
 const fieldAliases: Array<[RegExp, string]> = [
@@ -76,17 +79,22 @@ function normalizeLocalResult(result: DocumentProcessingResult, localPdfText = "
     if (/income$/.test(name) && /^[$,\d]+(?:\.\d+)?$/.test(value.trim())) return { ...field, name, value: Number(value.replace(/[$,]/g, "")).toFixed(2) };
     return { ...field, name, value };
   });
-  const fields = normalizedFields.filter((field, index) => normalizedFields.findIndex((candidate) => candidate.name === field.name) === index);
-  const recovered = fieldsFromLocalPdfText(localPdfText).filter((candidate) => !fields.some((field) => field.name === candidate.name));
+  const recovered = fieldsFromLocalPdfText(localPdfText).filter((candidate) => {
+    const existing = normalizedFields.find((field) => field.name === candidate.name);
+    return !existing || existing.confidence < minimumFieldConfidence || !existing.sourcePage || !existing.sourceText;
+  });
+  const recoveredNames = new Set(recovered.map((field) => field.name));
+  const fields = normalizedFields.filter((field, index) => !recoveredNames.has(field.name) && normalizedFields.findIndex((candidate) => candidate.name === field.name) === index);
   return { ...result, fields: [...fields, ...recovered] };
 }
 
 async function contentFor(input: DocumentProcessingInput, renderPdf = false, localPdfText = "") {
   if (input.mimeType === "text/plain" || input.mimeType === "text/csv") return [{ type: "text", text: `Document filename: ${input.filename}\n\n${Buffer.from(input.bytes).toString("utf8")}` }];
   const data = `data:${input.mimeType};base64,${Buffer.from(input.bytes).toString("base64")}`;
-  if (input.mimeType.startsWith("image/")) return [{ type: "text", text: `Document filename: ${input.filename}` }, { type: "image_url", image_url: { url: data } }];
+  if (input.mimeType.startsWith("image/")) return [{ type: "text", text: `Document filename: ${input.filename}\nThis is page 1. The page image was locally rotated, deskewed, denoised, contrast-normalized, and cropped before analysis.` }, { type: "image_url", image_url: { url: (await preprocessImage(input.bytes)).dataUrl } }];
   if (input.mimeType === "application/pdf" && renderPdf) {
-    return [{ type: "text", text: `Document filename: ${input.filename}. The following page images are the locally rendered pages of this PDF. Locally extracted text layer (use only to verify what is visible):\n${localPdfText}` }, ...(await renderPdfToPngDataUrls(input.bytes, input.filename)).map((url) => ({ type: "image_url", image_url: { url } }))];
+    const pages = await renderPdfToPngDataUrls(input.bytes, input.filename);
+    return [{ type: "text", text: `Document filename: ${input.filename}. The following page images are locally rendered, rotated, deskewed, denoised, contrast-normalized, and cropped pages of this PDF. Locally extracted text layer (use only to verify what is visible):\n${localPdfText}` }, ...pages.flatMap((url, index) => [{ type: "text", text: `Page ${index + 1} follows.` }, { type: "image_url", image_url: { url } }])];
   }
   if (input.mimeType === "application/pdf") return [{ type: "text", text: `Document filename: ${input.filename}. This provider adapter accepts PDF bytes only when the selected model supports PDF/file inputs. If it does not, return a warning rather than inventing values.` }, { type: "file", file: { filename: input.filename, file_data: data } }];
   return [{ type: "text", text: `Document filename: ${input.filename}\nBinary document type: ${input.mimeType}. Return warnings if the model cannot inspect it.` }];
@@ -101,22 +109,19 @@ export class OpenAICompatibleDocumentProcessor implements DocumentProcessor {
     return { Authorization: `Bearer ${this.config.apiKey}` };
   }
 
-  async processDocument(input: DocumentProcessingInput) {
-    if (!this.config.apiKey && (this.config.requiresApiKey ?? true)) throw new Error(`${this.config.name} processing is enabled but its API key is missing.`);
+  private async requestJson(userContent: unknown[], systemPrompt: string, responseSchema: Record<string, unknown>, maxTokens: number) {
     let response: Response | undefined;
-    const localPdfText = input.mimeType === "application/pdf" && this.config.renderPdf ? await extractPdfText(input.bytes).catch(() => "") : "";
-    const userContent = await contentFor(input, this.config.renderPdf, localPdfText);
-    const localInstruction = this.config.renderPdf ? " Inspect every rendered page and every labeled line. Return only non-empty fields using the exact field names from the schema. For identity documents, explicitly include identification_type and identification_expiration_date." : "";
     for (let attempt = 0; attempt < 4; attempt += 1) {
       response = await fetch(this.config.endpoint, {
         method: "POST",
         headers: { ...this.authHeaders(), "Content-Type": "application/json", ...this.config.headers },
         body: JSON.stringify({
           model: this.config.model,
-          temperature: 0.1,
-          max_tokens: 1800,
+          temperature: 0,
+          max_tokens: maxTokens,
+          format: responseSchema,
           ...(this.config.omitResponseFormat ? {} : { response_format: { type: "json_object" } }),
-          messages: [{ role: "system", content: `${extractionPrompt}${localInstruction}` }, { role: "user", content: userContent }],
+          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userContent }],
           ...this.config.body,
         }),
         signal: AbortSignal.timeout(env.DOCUMENT_PROCESSOR_TIMEOUT_MS),
@@ -127,13 +132,40 @@ export class OpenAICompatibleDocumentProcessor implements DocumentProcessor {
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
     if (!response) throw new Error(`${this.config.name} document processor did not return a response.`);
-    const responseText = await response.text();
+    const responseText = await response.clone().text();
     if (!response.ok) throw new Error(`${this.config.name} document processor returned HTTP ${response.status}.`);
     const payload = JSON.parse(responseText) as { choices?: { message?: { content?: string | { text?: string }[] } }[] };
     const content = payload.choices?.[0]?.message?.content;
     const text = Array.isArray(content) ? content.map((part) => part.text ?? "").join("") : content;
     if (!text) throw new Error(`${this.config.name} document processor returned no structured text.`);
-    const result = processingResultSchema.parse(parseExtractionJson(text));
-    return this.config.renderPdf ? normalizeLocalResult(result, localPdfText) : result;
+    return text;
+  }
+
+  async processDocument(input: DocumentProcessingInput) {
+    if (!this.config.apiKey && (this.config.requiresApiKey ?? true)) throw new Error(`${this.config.name} processing is enabled but its API key is missing.`);
+    const localPdfText = input.mimeType === "application/pdf" && this.config.renderPdf ? await extractPdfText(input.bytes).catch(() => "") : "";
+    const userContent = await contentFor(input, this.config.renderPdf, localPdfText);
+    let classifications = "";
+    let classifiedCategory = input.category || "OTHER";
+    const classificationWarnings: string[] = [];
+    const localClassification = classifyPagesLocally(input.filename, localPdfText, input.category, input.mimeType);
+    if (localClassification) {
+      classifiedCategory = localClassification.category;
+      classifications = localClassification.summary;
+    } else {
+      try {
+        const classificationText = await this.requestJson(userContent, classificationPrompt, classificationJsonSchema, 700);
+        const classification = classificationResultSchema.parse(parseClassificationJson(classificationText));
+        classifiedCategory = classification.pages.sort((left, right) => right.confidence - left.confidence)[0]?.category || classifiedCategory;
+        classifications = classification.pages.map((page) => `page ${page.page}: ${page.category} (${Math.round(page.confidence * 100)}%, ${page.reason})`).join("; ");
+        classificationWarnings.push(...classification.warnings);
+      } catch {
+        classificationWarnings.push("Page classification was unavailable; extraction used the uploaded category or OTHER and requires human review.");
+      }
+    }
+    const extractionText = await this.requestJson(userContent, extractionPromptFor(classifiedCategory, classifications), extractionJsonSchema, 1800);
+    const result = processingResultSchema.parse(parseExtractionJson(extractionText));
+    const normalized = this.config.renderPdf ? normalizeLocalResult(result, localPdfText) : result;
+    return enforceExtractionQuality({ ...normalized, warnings: [...classificationWarnings, ...normalized.warnings] });
   }
 }

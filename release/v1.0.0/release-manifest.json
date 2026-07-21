@@ -5,8 +5,8 @@
   "status": "stable",
   "syntheticOnly": true,
   "validation": {
-    "safeChecks": "10/10",
-    "unitIntegrationPassed": 205,
+    "safeChecks": "11/11",
+    "unitIntegrationPassed": 207,
     "unitIntegrationSkipped": 5,
     "browserTestsPassed": 11,
     "syntheticApplicants": 120,
@@ -15,6 +15,7 @@
   "contents": [
     "README.md",
     "LOCAL_OLLAMA.md",
+    "AI_EXTRACTION_QUALITY.md",
     "RELEASE_NOTES.md",
     "GITHUB_RELEASE_BODY.md",
     "RELEASE_CHECKLIST.md",

@@ -18,7 +18,7 @@ Status reviewed July 15, 2026. Repository-controlled release engineering is comp
 
 ## Current verification
 
-- Unit/integration: 36 files passed, 5 service-gated files skipped; 204 tests passed, 5 skipped.
+- Unit/integration: 36 files passed, 5 service-gated files skipped; 207 tests passed, 5 skipped.
 - Browser E2E: 11 passed across caseworker, reviewer, administrator, setup, application automation, downloads, axe checks, health, metrics, and authorization denial.
 - TypeScript: passed.
 - ESLint: passed.

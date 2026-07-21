@@ -15,8 +15,8 @@ This package is synthetic-data ready and locally validated. It is not an authori
 
 ## Validation snapshot
 
-- `npm run validate`: 10/10 safe checks passed.
-- Unit/integration: 205 passed, 5 skipped.
+- `npm run validate`: 11/11 safe checks passed.
+- Unit/integration: 207 passed, 5 skipped.
 - Browser and automated accessibility: 11 passed.
 - Synthetic evaluation: 120 adversarial applicants passed.
 - Local OCR corpus: passed with full expected-value recall and source coverage.
@@ -134,7 +134,7 @@ OLLAMA_API_KEY=
 DOCUMENT_PROCESSOR_TIMEOUT_MS=120000
 ```
 
-Keep Ollama running locally (`ollama serve` when the desktop app is not already running), verify it with `ollama run qwen2.5vl:7b "Reply with exactly: OLLAMA_READY"`, and then run `npm run evaluate`. Full prerequisites, Windows/macOS/Linux installation, network boundaries, and production approval requirements are in [`docs/local-ollama.md`](docs/local-ollama.md).
+Keep Ollama running locally (`ollama serve` when the desktop app is not already running), verify it with `ollama run qwen2.5vl:7b "Reply with exactly: OLLAMA_READY"`, and then run `npm run evaluate`. Full prerequisites, Windows/macOS/Linux installation, network boundaries, and production approval requirements are in [`docs/local-ollama.md`](docs/local-ollama.md). Extraction preprocessing, abstention rules, conflict detection, and the synthetic quality corpus are documented in [`docs/ai-extraction-quality.md`](docs/ai-extraction-quality.md).
 
 ## Upgrade and rollback
 

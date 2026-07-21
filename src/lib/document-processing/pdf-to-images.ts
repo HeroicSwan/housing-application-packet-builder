@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { preprocessImage } from "./preprocess";
 
 const execFileAsync = promisify(execFile);
 const maxPages = 10;
@@ -33,7 +34,8 @@ export async function renderPdfToPngDataUrls(bytes: Uint8Array, filename: string
     await execFileAsync(rendererPath(), ["-png", "-r", "144", "-f", "1", "-l", String(pageCount), pdfPath, outputPrefix], { windowsHide: true, maxBuffer: 1024 * 1024 });
     const renderedFiles = (await readdir(tempDirectory)).filter((file) => /^page-\d+\.png$/i.test(file)).sort((left, right) => Number(left.match(/\d+/)?.[0] ?? 0) - Number(right.match(/\d+/)?.[0] ?? 0));
     if (renderedFiles.length !== pageCount) throw new Error(`Local PDF renderer returned ${renderedFiles.length} page image(s) for ${filename}; expected ${pageCount}.`);
-    return await Promise.all(renderedFiles.map(async (file) => `data:image/png;base64,${(await readFile(path.join(tempDirectory, file))).toString("base64")}`));
+    const pages = await Promise.all(renderedFiles.map(async (file) => preprocessImage(await readFile(path.join(tempDirectory, file)))));
+    return pages.map((page) => page.dataUrl);
   } finally {
     await rm(tempDirectory, { recursive: true, force: true });
   }
