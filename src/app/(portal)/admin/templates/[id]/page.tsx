@@ -4,6 +4,9 @@ import {
   addApplicationTemplateFieldAction,
   cloneApplicationTemplateVersionAction,
   deprecateApplicationTemplateAction,
+  approveTemplateAcceptanceAction,
+  recordTemplateSandboxTestAction,
+  uploadTemplateAcceptanceAction,
   publishApplicationTemplateAction,
   rollbackApplicationTemplateAction,
   updateApplicationTemplateFieldAction,
@@ -14,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { activateOrganizationContext, requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db";
+import { compareTemplateVersions } from "@/lib/applications/template-compatibility";
 
 const canonicalPaths = [
   "",
@@ -69,10 +73,12 @@ export default async function TemplateEditorPage({
     include: {
       housingProgram: true,
       fields: { orderBy: { displayOrder: "asc" } },
+      supersedesTemplate: { include: { fields: true } },
     },
   });
   if (!template) notFound();
   const editable = template.status === "DRAFT";
+  const compatibility = template.supersedesTemplate ? compareTemplateVersions(template.supersedesTemplate.fields, template.fields) : { compatible: true, blockers: [], added: [], removed: [], changed: [] };
   return (
     <div>
       <Link
@@ -113,6 +119,15 @@ export default async function TemplateEditorPage({
           )}
         </div>
       </div>
+      <section className="mt-6 grid gap-4 border bg-white p-5 lg:grid-cols-2">
+        <div><p className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">Deployment gates</p><h2 className="mt-1 text-lg font-semibold">{template.requiresAgencyAcceptance ? "Real agency template" : "Synthetic / internal template"}</h2><p className="mt-2 text-sm text-muted-foreground">{template.requiresAgencyAcceptance ? "Publication is blocked until the approved PDF, mapping rules, sandbox evidence, and signed agency acceptance are all recorded." : "This version can be used for synthetic QA. Mark real agency templates at creation so external acceptance cannot be skipped."}</p><div className="mt-4 grid gap-2 text-xs"><Gate label="Compatibility" value={compatibility.compatible ? "PASS" : "BLOCKED"} /><Gate label="Sandbox submission" value={template.sandboxTestStatus} /><Gate label="Signed acceptance" value={template.requiresAgencyAcceptance ? template.acceptanceStatus : "NOT_REQUIRED"} /></div></div>
+        <div className="border-l pl-5"><p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Compatibility report</p><p className="mt-2 text-sm text-muted-foreground">{template.supersedesTemplate ? `Compared with version ${template.supersedesTemplate.version}.` : "This is the first version; future upgrades will be compared against it."}</p>{compatibility.blockers.length > 0 && <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-red-700">{compatibility.blockers.map((item) => <li key={item}>{item}</li>)}</ul>}{template.supersedesTemplate && <p className="mt-3 text-xs text-muted-foreground">Added {compatibility.added.length} · changed {compatibility.changed.length} · removed {compatibility.removed.length}</p>}</div>
+      </section>
+      {template.requiresAgencyAcceptance && <section className="mt-6 grid gap-4 lg:grid-cols-2">
+        <form action={uploadTemplateAcceptanceAction.bind(null, id)} encType="multipart/form-data" className="border bg-white p-5"><h2 className="text-lg font-semibold">Signed agency acceptance</h2><p className="mt-1 text-xs text-muted-foreground">Upload the signed acceptance record supplied by the agency. An administrator must verify it before publication.</p><div className="mt-4 grid gap-3"><Input name="signerName" placeholder="Agency signer name" required /><Input name="signerEmail" type="email" placeholder="Agency signer email" required /><Input name="signedAt" type="date" required /><Input name="acceptanceRecord" type="file" accept="application/pdf,image/png,image/jpeg" required /><SubmitButton pendingLabel="Uploading record…">Upload acceptance record</SubmitButton></div></form>
+        <div className="border bg-white p-5"><h2 className="text-lg font-semibold">Acceptance status</h2><p className="mt-2 text-sm">{template.acceptanceStatus === "PENDING" ? "No signed record has been uploaded." : `${template.acceptanceStatus} · ${template.acceptanceSignerName ?? "Signer not recorded"}${template.acceptanceSignedAt ? ` · signed ${template.acceptanceSignedAt.toLocaleDateString()}` : ""}`}</p>{template.acceptanceStatus === "RECEIVED" && <form action={approveTemplateAcceptanceAction.bind(null, id)} className="mt-4"><SubmitButton pendingLabel="Verifying…">Verify signed record</SubmitButton></form>}</div>
+      </section>}
+      {template.requiresAgencyAcceptance && <section className="mt-6 border bg-white p-5"><h2 className="text-lg font-semibold">Sandbox submission evidence</h2><p className="mt-1 text-xs text-muted-foreground">Run the generated application through the agency’s sandbox endpoint or portal, then record the provider receipt. This form records evidence; it does not claim a provider accepted anything automatically.</p><form action={recordTemplateSandboxTestAction.bind(null, id)} className="mt-4 grid gap-3 md:grid-cols-[160px_1fr_2fr_auto]"><select name="status" className="h-10 border bg-white px-3"><option value="PASS">PASS</option><option value="FAIL">FAIL</option></select><Input name="reference" placeholder="Sandbox receipt / ticket" required /><Input name="summary" placeholder="What was submitted and what the provider returned (20+ characters)" required minLength={20} /><SubmitButton pendingLabel="Recording…">Record test</SubmitButton></form>{template.sandboxTestStatus !== "NOT_RUN" && <p className={`mt-3 text-xs ${template.sandboxTestStatus === "PASS" ? "text-emerald-700" : "text-red-700"}`}>{template.sandboxTestStatus} · {template.sandboxTestReference} · {template.sandboxTestSummary}</p>}</section>}
       {template.status === "ACTIVE" && (
         <section className="mt-6 grid gap-4 border border-amber-300 bg-amber-50 p-5 lg:grid-cols-2">
           <form action={deprecateApplicationTemplateAction.bind(null, id)} className="flex flex-wrap items-end gap-3">
@@ -210,6 +225,13 @@ export default async function TemplateEditorPage({
                   placeholder="Staff guidance"
                   disabled={!editable}
                 />
+                <Input
+                  name="validationRules"
+                  aria-label={`Validation rules for ${field.displayLabel}`}
+                  defaultValue={field.validationRules ?? ""}
+                  placeholder='Validation JSON, e.g. {"minLength":2}'
+                  disabled={!editable}
+                />
               </div>
               <div className="flex items-end gap-3">
                 <label className="mb-2 flex items-center gap-2 text-sm">
@@ -290,4 +312,9 @@ function Field({ name, label }: { name: string; label: string }) {
       />
     </div>
   );
+}
+
+function Gate({ label, value }: { label: string; value: string }) {
+  const good = ["PASS", "APPROVED", "NOT_REQUIRED"].includes(value);
+  return <div className="flex items-center justify-between border-b pb-2 last:border-b-0"><span className="text-slate-600">{label}</span><span className={good ? "font-semibold text-emerald-700" : "font-semibold text-amber-700"}>{value}</span></div>;
 }

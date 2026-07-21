@@ -388,6 +388,17 @@ model ApplicationTemplate {
   compatibilityKey       String?
   rollbackFromTemplateId String?
   migrationNotes         String?
+  requiresAgencyAcceptance Boolean                  @default(false)
+  acceptanceStatus        String                   @default("PENDING")
+  acceptanceStorageKey    String?
+  acceptanceFilename      String?
+  acceptanceSignerName    String?
+  acceptanceSignerEmail   String?
+  acceptanceSignedAt      DateTime?
+  sandboxTestStatus       String                   @default("NOT_RUN")
+  sandboxTestedAt         DateTime?
+  sandboxTestReference    String?
+  sandboxTestSummary      String?
   supersedesTemplateId   String?
   supersedesTemplate     ApplicationTemplate?       @relation("TemplateVersions", fields: [supersedesTemplateId], references: [id])
   newerVersions          ApplicationTemplate[]      @relation("TemplateVersions")

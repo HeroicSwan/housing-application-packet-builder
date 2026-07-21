@@ -1,0 +1,11 @@
+ALTER TABLE "ApplicationTemplate" ADD COLUMN "requiresAgencyAcceptance" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "ApplicationTemplate" ADD COLUMN "acceptanceStatus" TEXT NOT NULL DEFAULT 'PENDING';
+ALTER TABLE "ApplicationTemplate" ADD COLUMN "acceptanceStorageKey" TEXT;
+ALTER TABLE "ApplicationTemplate" ADD COLUMN "acceptanceFilename" TEXT;
+ALTER TABLE "ApplicationTemplate" ADD COLUMN "acceptanceSignerName" TEXT;
+ALTER TABLE "ApplicationTemplate" ADD COLUMN "acceptanceSignerEmail" TEXT;
+ALTER TABLE "ApplicationTemplate" ADD COLUMN "acceptanceSignedAt" DATETIME;
+ALTER TABLE "ApplicationTemplate" ADD COLUMN "sandboxTestStatus" TEXT NOT NULL DEFAULT 'NOT_RUN';
+ALTER TABLE "ApplicationTemplate" ADD COLUMN "sandboxTestedAt" DATETIME;
+ALTER TABLE "ApplicationTemplate" ADD COLUMN "sandboxTestReference" TEXT;
+ALTER TABLE "ApplicationTemplate" ADD COLUMN "sandboxTestSummary" TEXT;

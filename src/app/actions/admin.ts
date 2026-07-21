@@ -95,6 +95,7 @@ export async function createApplicationTemplateAction(programId: string, formDat
   const description = z.string().trim().min(5).max(1000).parse(formData.get("description"));
   const templateType = z.enum(["GENERATED_PDF", "ACROFORM"]).parse(formData.get("templateType"));
   const outputFilenamePattern = z.string().trim().min(5).max(160).parse(formData.get("outputFilenamePattern"));
+  const requiresAgencyAcceptance = formData.get("requiresAgencyAcceptance") === "on";
   const file = formData.get("file");
   let sourceStorageKey: string | null = null;
   let discovered: Awaited<ReturnType<typeof inspectAcroForm>> | null = null;
@@ -111,7 +112,7 @@ export async function createApplicationTemplateAction(programId: string, formDat
   }
   const version = (await db.applicationTemplate.aggregate({ where: { housingProgramId: programId, name }, _max: { version: true } }))._max.version ?? 0;
   const template = await db.$transaction(async (tx) => {
-    const created = await tx.applicationTemplate.create({ data: { housingProgramId: programId, name, description, version: version + 1, status: "DRAFT", templateType, sourceStorageKey, outputFilenamePattern, compatibilityKey: discovered ? sha256(JSON.stringify(discovered.fields.map((field) => ({ name: field.name, type: field.type })))) : null } });
+    const created = await tx.applicationTemplate.create({ data: { housingProgramId: programId, name, description, version: version + 1, status: "DRAFT", templateType, sourceStorageKey, outputFilenamePattern, requiresAgencyAcceptance, compatibilityKey: discovered ? sha256(JSON.stringify(discovered.fields.map((field) => ({ name: field.name, type: field.type })))) : null } });
     if (discovered) await tx.applicationTemplateField.createMany({ data: discovered.fields.map((field) => ({ templateId: created.id, fieldKey: field.name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, ""), displayLabel: field.name, fieldType: field.type, required: false, pageNumber: 1, section: "Agency form", displayOrder: field.displayOrder, pdfFieldName: field.name, staffGuidance: "Map this agency field to a canonical application value or mark it for staff entry." })) });
     await tx.auditEvent.create({ data: { userId: user.id, action: "APPLICATION_TEMPLATE_CREATED", entityType: "ApplicationTemplate", entityId: created.id, metadata: `${templateType} template created with ${discovered?.fields.length ?? 0} discovered field(s)` } });
     return created;
@@ -119,11 +120,65 @@ export async function createApplicationTemplateAction(programId: string, formDat
   redirect(`/admin/templates/${template.id}`);
 }
 
+export async function recordTemplateSandboxTestAction(templateId: string, formData: FormData) {
+  const user = activateOrganizationContext(await requireRole(["ADMIN"]));
+  const status = z.enum(["PASS", "FAIL"]).parse(formData.get("status"));
+  const reference = z.string().trim().min(3).max(200).parse(formData.get("reference"));
+  const summary = z.string().trim().min(20).max(2000).parse(formData.get("summary"));
+  const template = await db.applicationTemplate.findUniqueOrThrow({ where: { id: templateId } });
+  await db.$transaction([
+    db.applicationTemplate.update({ where: { id: template.id }, data: { sandboxTestStatus: status, sandboxTestedAt: new Date(), sandboxTestReference: reference, sandboxTestSummary: summary } }),
+    db.auditEvent.create({ data: { userId: user.id, action: "APPLICATION_TEMPLATE_SANDBOX_TEST_RECORDED", entityType: "ApplicationTemplate", entityId: template.id, metadata: `Sandbox submission test ${status}; reference and provider payload retained outside audit metadata` } }),
+  ]);
+  revalidatePath(`/admin/templates/${template.id}`);
+}
+
+export async function uploadTemplateAcceptanceAction(templateId: string, formData: FormData) {
+  const user = activateOrganizationContext(await requireRole(["ADMIN"]));
+  const template = await db.applicationTemplate.findUniqueOrThrow({ where: { id: templateId } });
+  const signerName = z.string().trim().min(2).max(160).parse(formData.get("signerName"));
+  const signerEmail = z.string().trim().email().max(320).parse(formData.get("signerEmail"));
+  const signedAt = z.coerce.date().max(new Date()).parse(formData.get("signedAt"));
+  const file = formData.get("acceptanceRecord");
+  if (!(file instanceof File) || !file.size) throw new Error("Upload the signed agency acceptance record.");
+  const validation = validateUpload(file, env.MAX_UPLOAD_MB);
+  if (!validation.valid) throw new Error(validation.error);
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (!(["application/pdf", "image/png", "image/jpeg"].includes(file.type)) || !validateFileSignature(bytes, file.type)) throw new Error("The acceptance record must be a valid PDF, PNG, or JPEG.");
+  await inspectDocumentSafety(bytes, file.type);
+  await scanForMalware(bytes);
+  const safeName = `${crypto.randomUUID()}-${sanitizeFilename(file.name)}`;
+  const stored = await putObject(`template-acceptance/${template.housingProgramId}/${template.id}/${safeName}`, bytes, file.type);
+  await db.$transaction([
+    db.applicationTemplate.update({ where: { id: template.id }, data: { acceptanceStatus: "RECEIVED", acceptanceStorageKey: stored.key, acceptanceFilename: file.name, acceptanceSignerName: signerName, acceptanceSignerEmail: signerEmail, acceptanceSignedAt: signedAt } }),
+    db.auditEvent.create({ data: { userId: user.id, action: "APPLICATION_TEMPLATE_ACCEPTANCE_UPLOADED", entityType: "ApplicationTemplate", entityId: template.id, metadata: "Signed agency acceptance record uploaded; document contents and signer details remain restricted" } }),
+  ]);
+  revalidatePath(`/admin/templates/${template.id}`);
+}
+
+export async function approveTemplateAcceptanceAction(templateId: string) {
+  const user = activateOrganizationContext(await requireRole(["ADMIN"]));
+  const template = await db.applicationTemplate.findUniqueOrThrow({ where: { id: templateId } });
+  if (template.acceptanceStatus !== "RECEIVED" || !template.acceptanceStorageKey || !template.acceptanceSignerName || !template.acceptanceSignedAt) throw new Error("A signed agency acceptance record must be uploaded before it can be verified.");
+  await db.$transaction([
+    db.applicationTemplate.update({ where: { id: template.id }, data: { acceptanceStatus: "APPROVED" } }),
+    db.auditEvent.create({ data: { userId: user.id, action: "APPLICATION_TEMPLATE_ACCEPTANCE_VERIFIED", entityType: "ApplicationTemplate", entityId: template.id, metadata: "Administrator verified the signed agency acceptance record" } }),
+  ]);
+  revalidatePath(`/admin/templates/${template.id}`);
+}
+
 export async function updateApplicationTemplateFieldAction(templateId: string, fieldId: string, formData: FormData) {
   const user = activateOrganizationContext(await requireRole(["ADMIN"]));
   const template = await db.applicationTemplate.findUniqueOrThrow({ where: { id: templateId } });
   if (template.status !== "DRAFT") throw new Error("Published template versions are immutable. Create a new version to make changes.");
   const field = await db.applicationTemplateField.findFirstOrThrow({ where: { id: fieldId, templateId } });
+  const validationRules = z.string().trim().max(2000).parse(String(formData.get("validationRules") ?? ""));
+  if (validationRules) {
+    try {
+      const parsed = JSON.parse(validationRules) as { pattern?: unknown; minLength?: unknown };
+      if (typeof parsed !== "object" || parsed === null || parsed.pattern !== undefined && typeof parsed.pattern !== "string" || parsed.minLength !== undefined && (!Number.isInteger(parsed.minLength) || Number(parsed.minLength) < 0)) throw new Error();
+    } catch { throw new Error("Validation rules must be valid JSON, for example {\"minLength\":2} or {\"pattern\":\"^[A-Z]+$\"}."); }
+  }
   const data = {
     displayLabel: z.string().trim().min(1).max(160).parse(formData.get("displayLabel")),
     fieldType: z.enum(["TEXT", "DATE", "CURRENCY", "BOOLEAN", "SELECT", "REPEATING_GROUP", "SIGNATURE"]).parse(formData.get("fieldType")),
@@ -131,6 +186,7 @@ export async function updateApplicationTemplateFieldAction(templateId: string, f
     canonicalFieldPath: z.string().trim().max(160).parse(String(formData.get("canonicalFieldPath") ?? "")) || null,
     section: z.string().trim().min(1).max(120).parse(formData.get("section")),
     staffGuidance: z.string().trim().max(500).parse(String(formData.get("staffGuidance") ?? "")) || null,
+    validationRules: validationRules || null,
   };
   await db.$transaction([db.applicationTemplateField.update({ where: { id: field.id }, data }), db.auditEvent.create({ data: { userId: user.id, action: "APPLICATION_TEMPLATE_FIELD_UPDATED", entityType: "ApplicationTemplateField", entityId: field.id, metadata: "Template field mapping updated" } })]);
   revalidatePath(`/admin/templates/${templateId}`);
@@ -153,6 +209,7 @@ export async function publishApplicationTemplateAction(templateId: string) {
   const previous = template.supersedesTemplateId ? await db.applicationTemplate.findUnique({ where: { id: template.supersedesTemplateId }, include: { fields: true } }) : null;
   const compatibility = previous ? compareTemplateVersions(previous.fields, template.fields) : { compatible: true, blockers: [] as string[] };
   if (!compatibility.compatible) throw new Error(`Template compatibility checks failed: ${compatibility.blockers.join(" ")}`);
+  if (template.requiresAgencyAcceptance && (template.acceptanceStatus !== "APPROVED" || template.sandboxTestStatus !== "PASS")) throw new Error("Real-agency templates require a verified signed acceptance record and a passing sandbox submission test before publication.");
   await db.$transaction([db.applicationTemplate.update({ where: { id: templateId }, data: { status: "ACTIVE", publishedAt: new Date(), compatibilityKey: templateVersionFingerprint(template.fields) } }), db.auditEvent.create({ data: { userId: user.id, action: "APPLICATION_TEMPLATE_PUBLISHED", entityType: "ApplicationTemplate", entityId: templateId, metadata: `Version ${template.version} published and locked after compatibility checks` } })]);
   revalidatePath(`/admin/templates/${templateId}`); revalidatePath(`/admin/programs/${template.housingProgramId}`);
 }
@@ -162,7 +219,7 @@ export async function cloneApplicationTemplateVersionAction(templateId: string) 
   const source = await db.applicationTemplate.findUniqueOrThrow({ where: { id: templateId }, include: { fields: true } });
   const version = (await db.applicationTemplate.aggregate({ where: { housingProgramId: source.housingProgramId, name: source.name }, _max: { version: true } }))._max.version ?? source.version;
   const clone = await db.$transaction(async (tx) => {
-    const created = await tx.applicationTemplate.create({ data: { housingProgramId: source.housingProgramId, name: source.name, description: source.description, version: version + 1, status: "DRAFT", templateType: source.templateType, sourceStorageKey: source.sourceStorageKey, sourceFilePath: source.sourceFilePath, outputFilenamePattern: source.outputFilenamePattern, supersedesTemplateId: source.id, migrationNotes: `Cloned from version ${source.version} for controlled upgrade.` } });
+    const created = await tx.applicationTemplate.create({ data: { housingProgramId: source.housingProgramId, name: source.name, description: source.description, version: version + 1, status: "DRAFT", templateType: source.templateType, sourceStorageKey: source.sourceStorageKey, sourceFilePath: source.sourceFilePath, outputFilenamePattern: source.outputFilenamePattern, supersedesTemplateId: source.id, requiresAgencyAcceptance: source.requiresAgencyAcceptance, migrationNotes: `Cloned from version ${source.version} for controlled upgrade.` } });
     await tx.applicationTemplateField.createMany({ data: source.fields.map((field) => ({ templateId: created.id, fieldKey: field.fieldKey, displayLabel: field.displayLabel, fieldType: field.fieldType, required: field.required, canonicalFieldPath: field.canonicalFieldPath, pageNumber: field.pageNumber, section: field.section, displayOrder: field.displayOrder, validationRules: field.validationRules, conditionalRules: field.conditionalRules, formattingRules: field.formattingRules, pdfFieldName: field.pdfFieldName, positionInformation: field.positionInformation, staffGuidance: field.staffGuidance, optionsJson: field.optionsJson })) });
     await tx.auditEvent.create({ data: { userId: user.id, action: "APPLICATION_TEMPLATE_VERSION_CREATED", entityType: "ApplicationTemplate", entityId: created.id, metadata: `Version ${created.version} cloned from version ${source.version}` } });
     return created;
@@ -186,7 +243,7 @@ export async function rollbackApplicationTemplateAction(templateId: string) {
   if (!source.publishedAt) throw new Error("Rollback requires a previously published template version.");
   const latest = await db.applicationTemplate.findFirst({ where: { housingProgramId: source.housingProgramId, name: source.name }, orderBy: { version: "desc" } });
   const created = await db.$transaction(async (tx) => {
-    const clone = await tx.applicationTemplate.create({ data: { housingProgramId: source.housingProgramId, name: source.name, description: source.description, version: (latest?.version ?? source.version) + 1, status: "DRAFT", templateType: source.templateType, sourceStorageKey: source.sourceStorageKey, sourceFilePath: source.sourceFilePath, outputFilenamePattern: source.outputFilenamePattern, supersedesTemplateId: latest?.id ?? source.id, rollbackFromTemplateId: source.id, migrationNotes: `Rollback draft recreated from published version ${source.version}.` } });
+    const clone = await tx.applicationTemplate.create({ data: { housingProgramId: source.housingProgramId, name: source.name, description: source.description, version: (latest?.version ?? source.version) + 1, status: "DRAFT", templateType: source.templateType, sourceStorageKey: source.sourceStorageKey, sourceFilePath: source.sourceFilePath, outputFilenamePattern: source.outputFilenamePattern, supersedesTemplateId: latest?.id ?? source.id, rollbackFromTemplateId: source.id, requiresAgencyAcceptance: source.requiresAgencyAcceptance, migrationNotes: `Rollback draft recreated from published version ${source.version}.` } });
     await tx.applicationTemplateField.createMany({ data: source.fields.map((field) => ({ templateId: clone.id, fieldKey: field.fieldKey, displayLabel: field.displayLabel, fieldType: field.fieldType, required: field.required, canonicalFieldPath: field.canonicalFieldPath, pageNumber: field.pageNumber, section: field.section, displayOrder: field.displayOrder, validationRules: field.validationRules, conditionalRules: field.conditionalRules, formattingRules: field.formattingRules, pdfFieldName: field.pdfFieldName, positionInformation: field.positionInformation, staffGuidance: field.staffGuidance, optionsJson: field.optionsJson })) });
     await tx.auditEvent.create({ data: { userId: user.id, action: "APPLICATION_TEMPLATE_ROLLBACK_DRAFTED", entityType: "ApplicationTemplate", entityId: clone.id, metadata: `Rollback draft created from immutable version ${source.version}` } });
     return clone;
